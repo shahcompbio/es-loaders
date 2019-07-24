@@ -18,9 +18,6 @@ class scRNAParser():
     def get_dim_red(self, sample_id):
         return self.data[sample_id]['tsne']
 
-    def get_clusters(self, sample_id):
-        return self.data[sample_id]['clusters']
-
     def get_celltypes(self, sample_id):
         return self.data[sample_id]['cellassign']
 
@@ -29,3 +26,6 @@ class scRNAParser():
 
     def get_rho(self):
         return self.data['rho']
+
+    def get_statistics(self, sample_id):
+        return self.data['statistics'][sample_id]

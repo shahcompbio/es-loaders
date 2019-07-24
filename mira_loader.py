@@ -53,9 +53,11 @@ class dimRedLoader():
     def _transform_and_load_data(self, data, patient_id, sample_id, host, port):
         es = ElasticsearchClient(host=host, port=port)
 
+        statistics = data.get_statistics(sample_id)
+
         print("LOADING PATIENT-SAMPLE RECORD")
-        es.load_record(self.METADATA_INDEX_NAME, {
-                       "patient_id": patient_id, "sample_id": sample_id})
+        es.load_record(self.METADATA_INDEX_NAME, self._get_patient_sample_record(
+            patient_id, sample_id, statistics))
 
         cells = data.get_cells(sample_id)
         dim_red = data.get_dim_red(sample_id)
@@ -78,6 +80,22 @@ class dimRedLoader():
     #                   QC
     #
     #############################################
+
+    def _get_patient_sample_record(self, patient_id, sample_id, statistics):
+        return {
+            "patient_id": patient_id,
+            "sample_id": sample_id,
+            "mito5": int(statistics["Mito5"]),
+            "mito10": int(statistics["Mito10"]),
+            "mito15": int(statistics["Mito15"]),
+            "mito20": int(statistics["Mito20"]),
+            "num_cells": int(statistics["Estimated Number of Cells"]),
+            "num_reads": int(statistics["Number of Reads"]),
+            "num_genes": int(statistics["Total Genes Detected"]),
+            "percent_barcodes": statistics["Valid Barcodes"],
+            "sequencing_sat": statistics["Sequencing Saturation"],
+            "median_umi": int(statistics["Median UMI Counts per Cell"])
+        }
 
     #############################################
     #
