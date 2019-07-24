@@ -59,13 +59,12 @@ class dimRedLoader():
 
         cells = data.get_cells(sample_id)
         dim_red = data.get_dim_red(sample_id)
-        clusters = data.get_clusters(sample_id)
         celltypes = data.get_celltypes(sample_id)
 
         filtered_cells = list(filter(lambda cell: cell in celltypes, cells))
 
         self._transform_and_load_cells(
-            patient_id, sample_id, filtered_cells, dim_red, clusters, celltypes, es)
+            patient_id, sample_id, filtered_cells, dim_red, celltypes, es)
 
         genes = data.get_gene_matrix(sample_id)
         self._transform_and_load_genes(
@@ -76,22 +75,28 @@ class dimRedLoader():
 
     #############################################
     #
+    #                   QC
+    #
+    #############################################
+
+    #############################################
+    #
     #                   CELLS
     #
     #############################################
 
     def _transform_and_load_cells(self,
-                                  patient_id, sample_id, cells, dim_red, clusters, celltypes, es):
+                                  patient_id, sample_id, cells, dim_red,  celltypes, es):
 
         cell_records = self._cell_record_generator(
-            patient_id, sample_id, cells, dim_red, clusters, celltypes)
+            patient_id, sample_id, cells, dim_red, celltypes)
 
         print("Loading Cells: " + sample_id)
 
         es.load_in_bulk(patient_id.lower() +
                         self.CELL_INDEX_NAME, cell_records)
 
-    def _cell_record_generator(self, patient_id, sample_id, cells, dim_red, clusters, celltypes):
+    def _cell_record_generator(self, patient_id, sample_id, cells, dim_red,  celltypes):
         for cell in cells:
             record = {
                 "cell_id": cell,
@@ -99,7 +104,6 @@ class dimRedLoader():
                 "sample_id": sample_id,
                 "x": dim_red[cell][0],
                 "y": dim_red[cell][1],
-                "cluster": int(clusters[cell]),
                 "cell_type": celltypes[cell]
             }
             yield record
