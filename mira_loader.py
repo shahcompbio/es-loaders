@@ -4,6 +4,8 @@ import yaml
 from common.scrna_parser import scRNAParser
 from utils.elasticsearch import ElasticsearchClient
 
+from utils.cli import CliClient
+
 
 class dimRedLoader():
 
@@ -18,7 +20,7 @@ class dimRedLoader():
     def __init__(self):
         pass
 
-    def load_data(self, dir_path):
+    def load_data(self, dir_path, host, port):
         print("PARSING YAML FILE")
         yaml_data = self._read_yaml(dir_path + self.YAML_NAME)
 
@@ -28,7 +30,7 @@ class dimRedLoader():
         print("LOADING DATA: " + patient_id)
 
         for sample_id in sample_ids:
-            self._load_sample_data(patient_id, sample_id, dir_path)
+            self._load_sample_data(patient_id, sample_id, dir_path, host, port)
 
     def _read_yaml(self, yaml_path):
         with open(yaml_path, 'r') as stream:
@@ -36,19 +38,20 @@ class dimRedLoader():
 
         return yaml_data
 
-    def _load_sample_data(self, patient_id, sample_id, dir_path):
+    def _load_sample_data(self, patient_id, sample_id, dir_path, host, port):
         print("READING " + sample_id)
         data_obj = self._read_file_(dir_path + sample_id + ".json")
 
         print("TRANSFORM + LOADING " + sample_id)
-        self._transform_and_load_data(data_obj, patient_id, sample_id)
+        self._transform_and_load_data(
+            data_obj, patient_id, sample_id, host, port)
 
     def _read_file_(self, file):
         data = scRNAParser(file)
         return data
 
-    def _transform_and_load_data(self, data, patient_id, sample_id):
-        es = ElasticsearchClient()
+    def _transform_and_load_data(self, data, patient_id, sample_id, host, port):
+        es = ElasticsearchClient(host=host, port=port)
 
         print("LOADING PATIENT-SAMPLE RECORD")
         es.load_record(self.METADATA_INDEX_NAME, {
@@ -141,11 +144,18 @@ class dimRedLoader():
                 yield record
 
 
-def main(filename):
+def main():
+    CLI = CliClient('Mira Loader')
+    CLI.add_filepath_argument(isFilepath=False)
+    CLI.add_elasticsearch_arguments()
+
+    print("STARTING ALHENA LOAD")
+    args = CLI.get_args()
     print("STARTING LOAD")
     loader = dimRedLoader()
-    loader.load_data(filename)
+    loader.load_data(args.file_root,
+                     host=args.es_host, port=args.es_port)
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main()

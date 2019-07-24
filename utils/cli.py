@@ -18,11 +18,11 @@ class CliClient():
         es_group.add_argument(
             '-port', dest='es_port', default=9200, help='ElasticSearch port')
 
-    def add_loader_argument(self, isFilepath):
-
+    def add_index_name_argument(self):
         self.parser.add_argument(
             '-id', dest='index_name', help='<Required> JIRA ID', required=True)
 
+    def add_filepath_argument(self, isFilepath):
         if isFilepath:
             self.parser.add_argument(
                 '-f', dest='file_paths', nargs='+', help='<Required> File paths to load', required=True)

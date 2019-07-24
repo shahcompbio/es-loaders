@@ -2,7 +2,7 @@ import sys
 from common.metrics_loader import MetricsLoader
 from common.copy_number_loader import CopyNumberLoader
 from common.gc_metrics_loader import GCMetricsLoader
-from analysis_loader import AnalysisLoader
+from alhena.analysis_loader import AnalysisLoader
 
 
 from utils.cli import CliClient
@@ -65,7 +65,8 @@ class AlhenaLoader():
 
 def main():
     CLI = CliClient('Alhena Loader')
-    CLI.add_loader_argument(isFilepath=False)
+    CLI.add_filepath_argument(isFilepath=False)
+    CLI.add_index_name_argument()
     CLI.add_elasticsearch_arguments()
     CLI.add_colossus_arguments()
 
@@ -74,7 +75,7 @@ def main():
     loader = AlhenaLoader()
     loader.load_all(args.file_root, args.index_name,
                     host=args.es_host, port=args.es_port,
-                    colossus_user=args.colossus_user, colossus_pw=args.colossus_pass)
+                    colossus_user=args.colossus_user, colossus_pw=args.colossus_password)
 
 
 if __name__ == '__main__':
