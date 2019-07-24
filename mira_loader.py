@@ -74,6 +74,12 @@ class dimRedLoader():
         rho = data.get_rho()
         self._transform_and_load_cellassign_rho(patient_id, sample_id, rho, es)
 
+    #############################################
+    #
+    #                   CELLS
+    #
+    #############################################
+
     def _transform_and_load_cells(self,
                                   patient_id, sample_id, cells, dim_red, clusters, celltypes, es):
 
@@ -98,6 +104,12 @@ class dimRedLoader():
             }
             yield record
 
+    #############################################
+    #
+    #                   GENES
+    #
+    #############################################
+
     def _transform_and_load_genes(self, patient_id, sample_id, cells, genes, es):
         gene_records = self._gene_record_generator(
             patient_id, sample_id, cells, genes)
@@ -120,6 +132,12 @@ class dimRedLoader():
                     "count": count
                 }
                 yield record
+
+    #############################################
+    #
+    #                   RHO
+    #
+    #############################################
 
     def _transform_and_load_cellassign_rho(self, patient_id, sample_id, rho, es):
 
