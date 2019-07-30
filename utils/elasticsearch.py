@@ -16,8 +16,7 @@ class ElasticsearchClient():
 
     __DEFAULT_MAPPING = {
         'mappings': {
-            "_doc": {
-                "dynamic_templates": [
+            "dynamic_templates": [
                         {
                             "string_values": {
                                 "match": "*",
@@ -27,8 +26,7 @@ class ElasticsearchClient():
                                 }
                             }
                         }
-                ]
-            }
+            ]
         }
     }
 
