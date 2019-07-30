@@ -92,6 +92,8 @@ class dimRedLoader():
             "num_cells": int(statistics["Estimated Number of Cells"]),
             "num_reads": int(statistics["Number of Reads"]),
             "num_genes": int(statistics["Total Genes Detected"]),
+            "mean_reads": int(statistics["Mean Reads per Cell"]),
+            "median_genes": int(statistics["Median Genes per Cell"]),
             "percent_barcodes": statistics["Valid Barcodes"],
             "sequencing_sat": statistics["Sequencing Saturation"],
             "median_umi": int(statistics["Median UMI Counts per Cell"])
