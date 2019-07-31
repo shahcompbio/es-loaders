@@ -31,4 +31,4 @@ class scRNAParser():
         return self.data['statistics'][sample_id]
 
     def get_sites(self, sample_id):
-        return self.data[sample_id]['sites']
+        return self.data[sample_id]['site']

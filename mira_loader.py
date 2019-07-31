@@ -36,7 +36,8 @@ class dimRedLoader():
         for sample_id_obj in sample_ids:
             sample_id = "CD45" + \
                 sample_id_obj["CD45"] + "_" + sample_id_obj["site"]
-            self._load_dashboard_data(sample_id["data"],
+            print(sample_id)
+            self._load_dashboard_data(sample_id_obj["data"],
                                       patient_id=patient_id, sample_id=sample_id, dir_path=dir_path, host=host, port=port)
 
     def _read_yaml(self, yaml_path):
@@ -54,33 +55,35 @@ class dimRedLoader():
 
         print("TRANSFORM + LOADING " + id_name)
         self._transform_and_load_data(
-            data_obj, patient_id=patient_id, sample_id=sample_id, host=host, port=port)
+            data_obj, data_filename, patient_id=patient_id, sample_id=sample_id, host=host, port=port)
 
     def _read_file_(self, file):
         data = scRNAParser(file)
         return data
 
-    def _transform_and_load_data(self, data, patient_id, sample_id, host, port):
+    def _transform_and_load_data(self, data, data_name, patient_id, sample_id, host, port):
         es = ElasticsearchClient(host=host, port=port)
 
         print("LOADING PATIENT-SAMPLE RECORD")
         es.load_record(self.METADATA_INDEX_NAME, self._get_patient_sample_record(
-            patient_id, sample_id, data))
+            patient_id, sample_id, data, data_name))
 
         dashboard_id = patient_id if sample_id is None else sample_id
         ids = {"patient_id": patient_id} if sample_id is None else {
             "patient_id": patient_id, "sample_id": sample_id}
 
-        cells = data.get_cells(dashboard_id)
-        dim_red = data.get_dim_red(dashboard_id)
-        celltypes = data.get_celltypes(dashboard_id)
+        cells = data.get_cells(data_name)
+        dim_red = data.get_dim_red(data_name)
+        celltypes = data.get_celltypes(data_name)
+
+        sites = data.get_sites(data_name) if sample_id is None else {}
 
         filtered_cells = list(filter(lambda cell: cell in celltypes, cells))
 
         self._transform_and_load_cells(
-            ids, dashboard_id, filtered_cells, dim_red, celltypes, es)
+            ids, dashboard_id, filtered_cells, dim_red, celltypes, sites, es)
 
-        genes = data.get_gene_matrix(dashboard_id)
+        genes = data.get_gene_matrix(data_name)
         self._transform_and_load_genes(
             ids, dashboard_id, filtered_cells, genes, es)
 
@@ -93,14 +96,14 @@ class dimRedLoader():
     #
     #############################################
 
-    def _get_patient_sample_record(self, patient_id, sample_id, data):
+    def _get_patient_sample_record(self, patient_id, sample_id, data, data_name):
 
         if sample_id is None:
             return {
                 "patient_id": patient_id
             }
         else:
-            statistics = data.get_statistics(sample_id)
+            statistics = data.get_statistics(data_name)
             return {
                 "patient_id": patient_id,
                 "sample_id": sample_id,
@@ -125,23 +128,26 @@ class dimRedLoader():
     #############################################
 
     def _transform_and_load_cells(self,
-                                  ids, dashboard_id, cells, dim_red,  celltypes, es):
+                                  ids, dashboard_id, cells, dim_red,  celltypes, sites, es):
 
         cell_records = self._cell_record_generator(
-            ids, cells, dim_red, celltypes)
+            ids, cells, dim_red, celltypes, sites)
 
         print("Loading Cells: " + dashboard_id)
 
         es.load_in_bulk(ids["patient_id"].lower() +
                         self.CELL_INDEX_NAME, cell_records)
 
-    def _cell_record_generator(self, ids, cells, dim_red,  celltypes):
+    def _cell_record_generator(self, ids, cells, dim_red,  celltypes, sites):
+
         for cell in cells:
+            site = {} if "sample_id" in ids else {"site": sites[cell]}
             record = {
                 "cell_id": cell,
                 "x": dim_red[cell][0],
                 "y": dim_red[cell][1],
                 "cell_type": celltypes[cell],
+                **site,
                 **ids
             }
             yield record
