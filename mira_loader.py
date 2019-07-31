@@ -141,7 +141,8 @@ class dimRedLoader():
     def _cell_record_generator(self, ids, cells, dim_red,  celltypes, sites):
 
         for cell in cells:
-            site = {} if "sample_id" in ids else {"site": sites[cell]}
+            site = {} if "sample_id" in ids else {
+                "site": sites[cell] if sites['cell'] != 'INFERIOR_OMENTUM' else 'INFRACOLIC_OMENTUM'}
             record = {
                 "cell_id": cell,
                 "x": dim_red[cell][0],
