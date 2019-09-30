@@ -1,5 +1,6 @@
 import json
 import numpy
+import os
 
 from singlecellexperiment import SingleCellExperiment
 from genemarkermatrix import GeneMarkerMatrix
@@ -94,7 +95,7 @@ class scRNAParser():
         coldata = self.data.colData
         celltype = scRNAParser.unformat_celltype(celltype)
         assert celltype in coldata, 'Cell type not found - {}'.format(celltype)
-        return zip(coldata["Barcode"],coldata[celltype])
+        return dict(zip(coldata["Barcode"],coldata[celltype]))
 
     def get_pathway(self, pathway):
         coldata = self.data.colData
@@ -103,18 +104,20 @@ class scRNAParser():
 
 
 if __name__ == '__main__':
-    parser = scRNAParser("test.rdata")
+    parser = scRNAParser("SPECTRUM-OV-002_S1_CD45N_RIGHT_ADNEXA.rdata")
     sample_id = parser.get_samples()
-    print(sample_id)
-    print(parser.get_cells(sample_id))
-    print(parser.get_dim_red(sample_id))
-    print(parser.get_celltypes(sample_id))
-    print(parser.get_assays(sample_id))
-    print(parser.get_gene_matrix(sample_id))
-    print(parser.get_rho())
-    print(parser.get_statistics(sample_id))
-    print(parser.get_celltype_probability("Ovarian cancer cell"))
-    print(parser.get_pathway("repairtype"))
+
+    site = parser.data.colData["site"]
+    print(site)
+
+    # print(parser.get_cells(sample_id))
+    # print(parser.get_dim_red(sample_id))
+    # print(parser.get_celltypes(sample_id))
+    # print(parser.get_assays(sample_id))
+    # print(parser.get_gene_matrix(sample_id))
+    # print(parser.get_statistics(sample_id))
+    # print(parser.get_celltype_probability("Monocyte/Macrophage"))
+    # print(parser.get_pathway("repairtype"))
 
 
 
