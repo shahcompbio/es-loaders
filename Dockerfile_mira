@@ -2,8 +2,15 @@ FROM python:3
 
 WORKDIR /usr/src/app
 COPY ./requirements.txt .
+RUN apt-get update && apt-get install -y r-base
+RUN R -e "install.packages('BiocManager')"
+RUN R -e "BiocManager::install()"
+RUN R -e "BiocManager::install('SingleCellExperiment')"
+RUN R -e "BiocManager::install('scater')"
+
 RUN pip install -r requirements.txt
 
 COPY . .
 
 CMD python mira_loader.py -f $FILEPATH
+

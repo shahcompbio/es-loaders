@@ -2,3 +2,4 @@ elasticsearch
 pandas
 requests
 pyyaml
+rpy2
