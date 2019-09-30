@@ -75,10 +75,12 @@ class scRNAParser():
         statistics = dict()
         statistics["Sample"] = sample_id
 
+        #Keeping for consistency, no way to pull from SCE object currently
         statistics["Chemistry"] = "Single Cell 3' v3"
         statistics["Mean Reads per Cell"] = "NA"
         statistics["Sequencing Saturation"] = "NA"
         statistics["Valid Barcodes"] = "NA"
+        ##################################################################
 
         statistics["Mito20"] = len(list(filter(lambda x: x < 20, coldata["pct_counts_mito"])))
         statistics["Estimated Number of Cells"] = len(coldata["Barcode"])
@@ -101,7 +103,7 @@ class scRNAParser():
 
 
 if __name__ == '__main__':
-    parser = scRNAParser("SPECTRUM-OV-026_CD45N.rdata")
+    parser = scRNAParser("test.rdata")
     sample_id = parser.get_samples()
     print(sample_id)
     print(parser.get_cells(sample_id))
