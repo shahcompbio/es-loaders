@@ -2,3 +2,5 @@ elasticsearch
 pandas
 requests
 pyyaml
+rpy2
+scipy
