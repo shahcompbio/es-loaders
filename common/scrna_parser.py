@@ -1,6 +1,7 @@
 import json
 import numpy
 import os
+import collections
 
 from singlecellexperiment import SingleCellExperiment
 from genemarkermatrix import GeneMarkerMatrix
@@ -49,7 +50,15 @@ class scRNAParser():
         return self.data.assayNames
 
     def get_gene_matrix(self, sample_id, assay="logcounts"):
-        return self.data.get_assay(assay)
+        coldata = self.data.colData
+        rowdata = self.data.rowData
+        matrix = self.data.assays[assay].tolist()
+        assay_matrix = collections.defaultdict(dict)
+        for symbol, row in zip(rowdata["Symbol"],matrix):
+            for barcode, cell in zip(coldata["Barcode"],row):
+                if float(cell) != 0.0:
+                    assay_matrix[barcode][symbol] = cell
+        return dict(assay_matrix)
 
     @staticmethod
     def get_rho(filename=None):
@@ -108,13 +117,13 @@ if __name__ == '__main__':
     sample_id = parser.get_samples()
 
     site = parser.data.colData["site"]
-    print(site)
+    # print(site)
 
     # print(parser.get_cells(sample_id))
     # print(parser.get_dim_red(sample_id))
     # print(parser.get_celltypes(sample_id))
     # print(parser.get_assays(sample_id))
-    # print(parser.get_gene_matrix(sample_id))
+    print(parser.get_gene_matrix(sample_id))
     # print(parser.get_statistics(sample_id))
     # print(parser.get_celltype_probability("Monocyte/Macrophage"))
     # print(parser.get_pathway("repairtype"))
