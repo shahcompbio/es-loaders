@@ -177,8 +177,9 @@ def main():
     print("STARTING MIRA LOAD")
     args = CLI.get_args()
     print("STARTING LOAD")
+    print(args)
     load_analysis(args.file_root, args.mira_id, args.mira_type,
-                  host=args.es_host, port=args.es_host)
+                  host=args.es_host, port=args.es_port)
 
 
 if __name__ == '__main__':
