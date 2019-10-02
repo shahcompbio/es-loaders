@@ -167,15 +167,18 @@ def load_dashboard_entry(type, dashboard_id, host="localhost", port=9200):
 
 
 def main():
-    # CLI = CliClient('Mira Loader')
-    # CLI.add_filepath_argument(isFilepath=False)
-    # CLI.add_elasticsearch_arguments()
+    CLI = CliClient('Mira Loader')
+    CLI.add_filepath_argument(isFilepath=False)
+    CLI.add_elasticsearch_arguments()
 
-    # print("STARTING MIRA LOAD")
-    # args = CLI.get_args()
-    # print("STARTING LOAD")
-    load_analysis("common/", "SPECTRUM-OV-002_S1_CD45N_RIGHT_ADNEXA", "sample",
-                  host='localhost', port=9200)
+    mira_group = CLI.parser.add_argument_group("Mira")
+    mira_group.add_argument('-id', dest="mira_id", required=True)
+    mira_group.add_argument('-type', dest="mira_type", default="sample")
+    print("STARTING MIRA LOAD")
+    args = CLI.get_args()
+    print("STARTING LOAD")
+    load_analysis(args.file_root, args.mira_id, args.mira_type,
+                  host=args.es_host, port=args.es_host)
 
 
 if __name__ == '__main__':
