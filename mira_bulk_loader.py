@@ -7,9 +7,9 @@ import sys
 def load_samples(filepath, host="localhost", port=9200):
 
     samples = all_samples()
-    for sample in samples:
+    for sample_id, sample_record in samples.items():
         load_analysis(
-            filepath, sample["nick_unique_id"], "sample", host=host, port=port)
+            filepath, sample_id, "sample", host=host, port=port)
 
 
 if __name__ == '__main__':
