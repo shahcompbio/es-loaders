@@ -4,6 +4,28 @@ from elasticsearch import helpers
 import types
 
 
+def load_record(index, record, host="localhost", port=9200):
+    es = ElasticsearchClient(host=host, port=port)
+    if not es.is_index_exists(index):
+        es.create_index(index)
+
+    es.es.index(index=index, doc_type="_doc", body=record)
+
+# Putting this method here but later we can extend parallelization through multiple cores by splitting here (as we need multiple ES instances)
+
+
+def load_records(index, records, host="localhost", port=9200):
+    es = ElasticsearchClient(host=host, port=port)
+
+    if not es.is_index_exists(index):
+        es.create_index(index)
+
+    if isinstance(records, types.GeneratorType):
+        es.load_bulk_parallel(index, records)
+    else:
+        es.load_bulk(index, records)
+
+
 class ElasticsearchClient():
 
     __DEFAULT_SETTINGS = {
@@ -50,21 +72,6 @@ class ElasticsearchClient():
 
     # ###############################
     # LOADING METHODS
-
-    def load_record(self, index, record):
-        if not self.is_index_exists(index):
-            self.create_index(index)
-
-        self.es.index(index=index, doc_type="_doc", body=record)
-
-    def load_in_bulk(self, index, records):
-        if not self.is_index_exists(index):
-            self.create_index(index)
-
-        if isinstance(records, types.GeneratorType):
-            self.load_bulk_parallel(index, records)
-        else:
-            self.load_bulk(index, records)
 
     def load_bulk(self, index, records):
         try:

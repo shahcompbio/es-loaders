@@ -2,225 +2,180 @@ import sys
 import math
 import yaml
 from common.scrna_parser import scRNAParser
-from utils.elasticsearch import ElasticsearchClient
-
+from utils.elasticsearch import load_records, load_record
+from mira.mira_metadata_parser import single_sample
 from utils.cli import CliClient
 
+SAMPLE_METADATA_INDEX = "sample_metadata"
+SAMPLE_STATS_INDEX = "sample_stats"
+SAMPLE_CELLS_INDEX = "sample_cells"
+DASHBOARD_REDIM_INDEX = "dashboard_redim_"
+DASHBOARD_GENES_INDEX = "dashboard_genes_"
+DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 
-class dimRedLoader():
 
-    YAML_NAME = "patient_metadata.yaml"
+def load_analysis(filepath, dashboard_id, type, host="localhost", port=9200):
+    print("====================== " + dashboard_id)
+    print("Opening File")
+    data = scRNAParser(filepath + dashboard_id + ".rdata")
 
-    METADATA_INDEX_NAME = "patient_metadata"
-    CELL_INDEX_NAME = "_cells"
-    GENE_INDEX_NAME = "_genes"
-    RHO_INDEX_NAME = "_rho"
+    if type is "sample":
+        print("Load Sample Data")
+        load_sample_metadata(dashboard_id, host=host, port=port)
+        load_sample_cells(data, dashboard_id, host=host, port=port)
+        load_sample_statistics(data, dashboard_id, host=host, port=port)
 
-    # TODO: host + port variables
-    def __init__(self):
-        pass
+    load_dashboard_redim(data, dashboard_id, host=host, port=port)
+    load_dashboard_genes(data, dashboard_id, host=host, port=port)
 
-    def load_data(self, dir_path, host, port):
-        print("PARSING YAML FILE")
-        yaml_data = self._read_yaml(dir_path + self.YAML_NAME)
+    load_dashboard_entry(type, dashboard_id, host=host, port=port)
+    # Need rho loader (this only has to be done once)
 
-        patient_id = yaml_data["patient_id"]
-        sample_ids = yaml_data["sample_ids"]
 
-        print("LOADING DATA: " + patient_id)
-        # TODO: If data exists, load patient data
-        self._load_dashboard_data(yaml_data["patient_data"],
-                                  patient_id=patient_id, dir_path=dir_path, host=host, port=port)
+def load_sample_metadata(sample_id, host="localhost", port=9200):
+    print("LOADING SAMPLE METADATA: " + sample_id)
+    metadata = single_sample(sample_id)
 
-        # TODO: If sample data exists, load
-        for sample_id_obj in sample_ids:
-            sample_id = "CD45" + \
-                sample_id_obj["CD45"] + "_" + sample_id_obj["site"]
-            print(sample_id)
-            self._load_dashboard_data(sample_id_obj["data"],
-                                      patient_id=patient_id, sample_id=sample_id, dir_path=dir_path, host=host, port=port)
+    sort_status = metadata["sort_parameters"].split(",")[2].strip()
+    sort = {"U": "unsorted", "CD45+": "CD45P",
+            "CD45-": "CD45N"}[sort_status]
 
-    def _read_yaml(self, yaml_path):
-        with open(yaml_path, 'r') as stream:
-            yaml_data = yaml.safe_load(stream)
+    record = {
+        "sample_id": sample_id,
+        "patient_id": metadata["patient_id"],  # parse from sample_id
+        "surgery": metadata["time"],  # parse S1/S2 from sample_id
+        "treatment": metadata["therapy"],  # pre | post
+        "site": metadata["tumour_site"],  # parse from sample_id
+        "sort": sort  # parse from sample_id
+    }
+    print(" BEGINNING LOAD")
+    print(record)
+    load_record(SAMPLE_METADATA_INDEX, record, host=host, port=port)
 
-        return yaml_data
 
-    def _load_dashboard_data(self, data_filename, patient_id, dir_path, host, port, sample_id=None):
+def load_sample_statistics(data, sample_id, host="localhost", port=9200):
 
-        id_name = patient_id if sample_id is None else sample_id
+    print("LOADING SAMPLE STATS: " + sample_id)
+    statistics = data.get_statistics()
 
-        print("READING " + id_name)
-        data_obj = self._read_file_(dir_path + data_filename + ".json")
+    stats_records = get_stats_records_generator(statistics, sample_id)
+    print(" BEGINNING LOAD")
+    load_records(SAMPLE_STATS_INDEX, stats_records, host=host, port=port)
 
-        print("TRANSFORM + LOADING " + id_name)
-        self._transform_and_load_data(
-            data_obj, data_filename, patient_id=patient_id, sample_id=sample_id, host=host, port=port)
 
-    def _read_file_(self, file):
-        data = scRNAParser(file)
-        return data
+def get_stats_records_generator(stats, sample_id):
+    for stat, value in stats.items():
+        record = {
+            "sample_id": sample_id,
+            "stat": stat,
+            "value": value
+        }
+        yield record
 
-    def _transform_and_load_data(self, data, data_name, patient_id, sample_id, host, port):
-        es = ElasticsearchClient(host=host, port=port)
 
-        print("LOADING PATIENT-SAMPLE RECORD")
-        es.load_record(self.METADATA_INDEX_NAME, self._get_patient_sample_record(
-            patient_id, sample_id, data, data_name))
+def load_sample_cells(data, sample_id, host="localhost", port=9200):
+    print("LOADING SAMPLE CELLS: " + sample_id)
+    cells = data.get_cells()
+    celltypes = data.get_celltypes()
 
-        dashboard_id = patient_id if sample_id is None else sample_id
-        ids = {"patient_id": patient_id} if sample_id is None else {
-            "patient_id": patient_id, "sample_id": sample_id}
+    rho_celltypes = data.get_rho_celltypes()
+    celltype_probabilities = data.get_all_celltype_probability()
 
-        cells = data.get_cells(data_name)
-        dim_red = data.get_dim_red(data_name)
-        celltypes = data.get_celltypes(data_name)
+    cell_records = get_sample_cells_generator(
+        cells, celltypes, rho_celltypes, celltype_probabilities, sample_id)
+    print(" BEGINNING LOAD")
+    load_records(SAMPLE_CELLS_INDEX, cell_records, host=host, port=port)
 
-        sites = data.get_sites(data_name) if sample_id is None else {}
 
-        filtered_cells = list(filter(lambda cell: cell in celltypes, cells))
+def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabilities, sample_id):
 
-        self._transform_and_load_cells(
-            ids, dashboard_id, filtered_cells, dim_red, celltypes, sites, es)
+    def get_cell_probabilities(cell):
+        cell_probabilities = {}
+        for celltype in rho_celltypes:
+            cell_probabilities[celltype +
+                               " probability"] = celltype_probabilities[celltype][cell]
 
-        genes = data.get_gene_matrix(data_name)
-        self._transform_and_load_genes(
-            ids, dashboard_id, filtered_cells, genes, es)
+        return cell_probabilities
 
-        rho = data.get_rho()
-        self._transform_and_load_cellassign_rho(ids, dashboard_id, rho, es)
+    for cell in cells:
+        cell_probabilities = get_cell_probabilities(cell)
+        record = {
+            "sample_id": sample_id,
+            "cell_id": cell,
+            "cell_type": celltypes[cell],
+            **cell_probabilities
+        }
+        yield record
 
-    #############################################
-    #
-    #                   QC
-    #
-    #############################################
 
-    def _get_patient_sample_record(self, patient_id, sample_id, data, data_name):
+def load_dashboard_redim(data, dashboard_id, host="localhost", port=9200):
+    print("LOADING DASHBOARD RE-DIM: " + dashboard_id)
+    cells = data.get_cells()
+    redim = data.get_re_dim()
 
-        if sample_id is None:
-            return {
-                "patient_id": patient_id
-            }
-        else:
-            statistics = data.get_statistics(data_name)
-            return {
-                "patient_id": patient_id,
-                "sample_id": sample_id,
-                "mito5": int(statistics["Mito5"]),
-                "mito10": int(statistics["Mito10"]),
-                "mito15": int(statistics["Mito15"]),
-                "mito20": int(statistics["Mito20"]),
-                "num_cells": int(statistics["Estimated Number of Cells"]),
-                "num_reads": int(statistics["Number of Reads"]),
-                "num_genes": int(statistics["Total Genes Detected"]),
-                "mean_reads": int(statistics["Mean Reads per Cell"]),
-                "median_genes": int(statistics["Median Genes per Cell"]),
-                "percent_barcodes": statistics["Valid Barcodes"],
-                "sequencing_sat": statistics["Sequencing Saturation"],
-                "median_umi": int(statistics["Median UMI Counts per Cell"])
-            }
+    redim_records = get_redim_record_generator(cells, redim, dashboard_id)
+    print(" BEGINNING LOAD")
+    load_records(DASHBOARD_REDIM_INDEX + dashboard_id.lower(),
+                 redim_records, host=host, port=port)
 
-    #############################################
-    #
-    #                   CELLS
-    #
-    #############################################
 
-    def _transform_and_load_cells(self,
-                                  ids, dashboard_id, cells, dim_red,  celltypes, sites, es):
+def get_redim_record_generator(cells, redim, dashboard_id):
+    for cell in cells:
+        record = {
+            "cell_id": cell,
+            "x": redim[cell][0],
+            "y": redim[cell][1],
+            "dashboard_id": dashboard_id
+        }
+        yield record
 
-        cell_records = self._cell_record_generator(
-            ids, cells, dim_red, celltypes, sites)
 
-        print("Loading Cells: " + dashboard_id)
+def load_dashboard_genes(data, dashboard_id, host="localhost", port=9200):
+    print("LOADING DASHBOARD GENES: " + dashboard_id)
+    cells = data.get_cells()
+    genes = data.get_gene_matrix()
 
-        es.load_in_bulk(ids["patient_id"].lower() +
-                        self.CELL_INDEX_NAME, cell_records)
+    gene_records = get_gene_record_generator(cells, genes, dashboard_id)
+    print(" BEGINNING LOAD")
+    load_records(DASHBOARD_GENES_INDEX + dashboard_id.lower(),
+                 gene_records, host=host, port=port)
 
-    def _cell_record_generator(self, ids, cells, dim_red,  celltypes, sites):
 
-        for cell in cells:
-            site = {} if "sample_id" in ids else {
-                "site": sites[cell] if sites['cell'] != 'INFERIOR_OMENTUM' else 'INFRACOLIC_OMENTUM'}
+def get_gene_record_generator(cells, gene_matrix, dashboard_id):
+    for cell in cells:
+        genes = gene_matrix[cell]
+
+        for gene, log_count in genes.items():
             record = {
                 "cell_id": cell,
-                "x": dim_red[cell][0],
-                "y": dim_red[cell][1],
-                "cell_type": celltypes[cell],
-                **site,
-                **ids
+                "gene": gene,
+                "log_count": log_count,
+                "dashboard_id": dashboard_id
             }
             yield record
 
-    #############################################
-    #
-    #                   GENES
-    #
-    #############################################
 
-    def _transform_and_load_genes(self, ids, dashboard_id, cells, genes, es):
-        gene_records = self._gene_record_generator(
-            ids, cells, genes)
-
-        print("Loading Genes: " + dashboard_id)
-
-        es.load_in_bulk(ids["patient_id"].lower() +
-                        self.GENE_INDEX_NAME, gene_records)
-
-    def _gene_record_generator(self, ids, cells, gene_matrix):
-        for cell in cells:
-            genes = gene_matrix[cell]
-
-            for gene, count in genes.items():
-                record = {
-                    "cell_id": cell,
-                    "gene": gene,
-                    "count": count,
-                    **ids
-                }
-                yield record
-
-    #############################################
-    #
-    #                   RHO
-    #
-    #############################################
-
-    def _transform_and_load_cellassign_rho(self, ids,
-                                           dashboard_id, rho, es):
-
-        rho_records = self._rho_record_generator(ids, rho)
-
-        print("Loading Rho: " + dashboard_id)
-
-        es.load_in_bulk(ids["patient_id"].lower() +
-                        self.RHO_INDEX_NAME, rho_records)
-
-    def _rho_record_generator(self, ids, rho):
-        for celltype, marker_genes in rho.items():
-            for gene in marker_genes:
-
-                record = {
-                    "celltype": celltype,
-                    "marker_gene": gene,
-                    **ids
-                }
-
-                yield record
+def load_dashboard_entry(type, dashboard_id, host="localhost", port=9200):
+    print("LOADING DASHBOARD ENTRY: " + dashboard_id)
+    record = {
+        "type": type,
+        "dashboard_id": dashboard_id
+    }
+    print(" BEGINNING LOAD")
+    print(record)
+    load_record(DASHBOARD_ENTRY_INDEX, record, host=host, port=port)
 
 
 def main():
-    CLI = CliClient('Mira Loader')
-    CLI.add_filepath_argument(isFilepath=False)
-    CLI.add_elasticsearch_arguments()
+    # CLI = CliClient('Mira Loader')
+    # CLI.add_filepath_argument(isFilepath=False)
+    # CLI.add_elasticsearch_arguments()
 
-    print("STARTING ALHENA LOAD")
-    args = CLI.get_args()
-    print("STARTING LOAD")
-    loader = dimRedLoader()
-    loader.load_data(args.file_root,
-                     host=args.es_host, port=args.es_port)
+    # print("STARTING MIRA LOAD")
+    # args = CLI.get_args()
+    # print("STARTING LOAD")
+    load_analysis("common/", "SPECTRUM-OV-002_S1_CD45N_RIGHT_ADNEXA", "sample",
+                  host='localhost', port=9200)
 
 
 if __name__ == '__main__':

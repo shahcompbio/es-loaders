@@ -24,7 +24,7 @@ class scRNAParser():
         return dict(sample_barcodes)
 
     def get_re_dim(self, embedding="UMAP"):
-        barcodes = self.get_cells(sample_id=sample_id)
+        barcodes = self.get_cells()
         embedding = zip(barcodes, self.data.getReducedDims(embedding))
         sample_embedding = filter(lambda cell: cell[0] in barcodes, embedding)
         return dict(sample_embedding)
@@ -43,8 +43,8 @@ class scRNAParser():
             cell_type = cell_type.replace("/", ".")
         return cell_type
 
-    def get_celltypes(self, sample_id):
-        barcodes = self.get_cells(sample_id=sample_id)
+    def get_celltypes(self):
+        barcodes = self.get_cells()
         celltypes = map(scRNAParser.format_celltype,
                         self.data.colData["cell_type"])
         barcoded_celltypes = zip(barcodes, celltypes)
@@ -52,25 +52,21 @@ class scRNAParser():
             lambda cell: cell[0] in barcodes, barcoded_celltypes)
         return dict(sample_celltypes)
 
-    def get_assays(self, sample_id):
+    def get_assays(self):
         return self.data.assayNames
 
-<<<<<<< HEAD
     def get_gene_matrix(self, assay="logcounts"):
-        return self.data.get_assay(assay)
-=======
-    def get_gene_matrix(self, sample_id, assay="logcounts"):
         coldata = self.data.colData
         rowdata = self.data.rowData
         matrix = self.data.assays[assay].tolist()
         assay_matrix = collections.defaultdict(dict)
-        for symbol, row in zip(rowdata["Symbol"],matrix):
-            for barcode, cell in zip(coldata["Barcode"],row):
+        for symbol, row in zip(rowdata["Symbol"], matrix):
+            for barcode, cell in zip(coldata["Barcode"], row):
                 if float(cell) != 0.0:
                     assay_matrix[barcode][symbol] = cell
         return dict(assay_matrix)
->>>>>>> origin/nick-dev
 
+    # Gonna refactor these rho functions out later
     @staticmethod
     def get_rho(filename=None):
         if not filename:
@@ -78,9 +74,17 @@ class scRNAParser():
             filename = os.path.join(package_directory, "markers.yaml")
         assert os.path.exists(filename), "Rho yaml not found."
         matrix = GeneMarkerMatrix.read_yaml(filename)
-        return matrix.to_json()
+        return matrix
 
-    def get_statistics(self, sample_id):
+    def get_rho_celltypes(self):
+        rho = self.get_rho()
+        return rho.cells
+
+    def get_rho_all_markers(self):
+        rho = self.get_rho()
+        return dict(rho.marker_list)
+
+    def get_statistics(self):
         count_assay = self.data.get_assay("counts")
         coldata = self.data.colData
         rowdata = self.data.rowData
@@ -94,23 +98,29 @@ class scRNAParser():
         median_genes_per_cell = numpy.median(genes_per_cell)
 
         statistics = dict()
-        statistics["Sample"] = sample_id
 
-        # Keeping for consistency, no way to pull from SCE object currently
-        statistics["Chemistry"] = "Single Cell 3' v3"
-        statistics["Mean Reads per Cell"] = "NA"
-        statistics["Sequencing Saturation"] = "NA"
-        statistics["Valid Barcodes"] = "NA"
-        ##################################################################
+        # # Keeping for consistency, no way to pull from SCE object currently
+        # statistics["Chemistry"] = "Single Cell 3' v3"
+        # statistics["Mean Reads per Cell"] = "NA"
+        # statistics["Sequencing Saturation"] = "NA"
+        # statistics["Valid Barcodes"] = "NA"
+        # ##################################################################
 
         statistics["Mito20"] = len(
             list(filter(lambda x: x < 20, coldata["pct_counts_mito"])))
         statistics["Estimated Number of Cells"] = len(coldata["Barcode"])
-        statistics["Median UMI Counts"] = str(int(numpy.median(total_counts)))
-        statistics["Number of Reads"] = str(int(numpy.sum(cell_counts)))
-        statistics["Median Genes per Cell"] = str(int(median_genes_per_cell))
-        statistics["Number of Genes"] = str(genes_with_expression)
+        statistics["Median UMI Counts"] = int(numpy.median(total_counts))
+        statistics["Number of Reads"] = int(numpy.sum(cell_counts))
+        statistics["Median Genes per Cell"] = int(median_genes_per_cell)
+        statistics["Number of Genes"] = genes_with_expression
         return statistics
+
+    def get_all_celltype_probability(self):
+        celltypes = self.get_rho_celltypes()
+        probabilities = [self.get_celltype_probability(
+            celltype) for celltype in celltypes]
+
+        return dict(zip(celltypes, probabilities))
 
     def get_celltype_probability(self, celltype):
         coldata = self.data.colData
