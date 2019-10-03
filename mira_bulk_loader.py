@@ -16,9 +16,9 @@ def load_samples(filepath, host="localhost", port=9200):
 
 def scrape_samples(filepath):
     samples = all_samples()
-    for sample_id, sample_record in samples.items()
-    data = scRNAParser(filepath + sample_id)
-    print(data.data.colData.keys())
+    for sample_id, sample_record in samples.items():
+        data = scRNAParser(filepath + sample_id)
+        print(data.data.colData.keys())
 
 
 if __name__ == '__main__':
