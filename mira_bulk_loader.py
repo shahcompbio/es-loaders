@@ -18,6 +18,7 @@ def scrape_samples(filepath):
     samples = all_samples()
     for sample_id, sample_record in samples.items():
         data = scRNAParser(filepath + sample_id)
+        print("===================== " + sample_id)
         print(data.data.colData.keys())
 
 
