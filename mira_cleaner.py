@@ -13,7 +13,7 @@ def clean_analysis(type, dashboard_id, host="localhost", port=9200):
     print("====================== " + dashboard_id)
     print("Cleaning records")
 
-    if type is "sample":
+    if type == "sample":
         print("DELETE SAMPLE METADATA")
         delete_records(SAMPLE_METADATA_INDEX, "sample_id",
                        dashboard_id, host=host, port=port)
