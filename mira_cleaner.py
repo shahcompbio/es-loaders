@@ -65,4 +65,5 @@ def fill_base_query(key, value):
 
 
 if __name__ == '__main__':
-    clean_analysis(sys.argv[1], sys.argv[2])
+    clean_analysis(sys.argv[1], sys.argv[2],
+                   host=sys.argv[3], port=sys.argv[4])
