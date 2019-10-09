@@ -32,7 +32,7 @@ def load_new_samples(filepath, host="localhost", port=9200):
                 load_analysis(
                     filepath, sample_id, "sample", host=host, port=port)
             except:
-                e = sys.exc_info()[0]
+                e = sys.exc_info()
                 print(e)
                 clean_analysis("sample", sample_id, host=host, port=port)
 
