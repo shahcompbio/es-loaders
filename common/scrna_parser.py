@@ -94,8 +94,7 @@ class scRNAParser():
         statistics["Number of Genes"] = genes_with_expression
         return statistics
 
-    def get_all_celltype_probability(self):
-        celltypes = self.get_rho_celltypes()
+    def get_all_celltype_probability(self, celltypes):
         probabilities = [self.get_celltype_probability(
             celltype) for celltype in celltypes]
 

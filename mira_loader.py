@@ -80,7 +80,7 @@ def load_sample_cells(data, sample_id, host="localhost", port=9200):
     celltypes = data.get_celltypes()
 
     rho_celltypes = get_rho_celltypes()
-    celltype_probabilities = data.get_all_celltype_probability()
+    celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
 
     cell_records = get_sample_cells_generator(
         cells, celltypes, rho_celltypes, celltype_probabilities, sample_id)
