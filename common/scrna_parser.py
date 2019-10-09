@@ -1,10 +1,7 @@
-import json
 import numpy
-import os
 import collections
 
 from common.singlecellexperiment import SingleCellExperiment
-from common.genemarkermatrix import GeneMarkerMatrix
 
 
 class scRNAParser():
@@ -65,24 +62,6 @@ class scRNAParser():
                 if float(cell) != 0.0:
                     assay_matrix[barcode][symbol] = cell
         return dict(assay_matrix)
-
-    # Gonna refactor these rho functions out later
-    @staticmethod
-    def get_rho(filename=None):
-        if not filename:
-            package_directory = os.path.dirname(os.path.abspath(__file__))
-            filename = os.path.join(package_directory, "markers.yaml")
-        assert os.path.exists(filename), "Rho yaml not found."
-        matrix = GeneMarkerMatrix.read_yaml(filename)
-        return matrix
-
-    def get_rho_celltypes(self):
-        rho = self.get_rho()
-        return rho.cells
-
-    def get_rho_all_markers(self):
-        rho = self.get_rho()
-        return dict(rho.marker_list)
 
     def get_statistics(self):
         count_assay = self.data.get_assay("counts")
