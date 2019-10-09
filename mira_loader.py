@@ -4,6 +4,7 @@ import yaml
 from common.scrna_parser import scRNAParser
 from utils.elasticsearch import load_records, load_record
 from mira.mira_metadata_parser import single_sample
+from rho_loader import get_rho_celltypes
 from utils.cli import CliClient
 
 SAMPLE_METADATA_INDEX = "sample_metadata"
@@ -78,7 +79,7 @@ def load_sample_cells(data, sample_id, host="localhost", port=9200):
     cells = data.get_cells()
     celltypes = data.get_celltypes()
 
-    rho_celltypes = data.get_rho_celltypes()
+    rho_celltypes = get_rho_celltypes()
     celltype_probabilities = data.get_all_celltype_probability()
 
     cell_records = get_sample_cells_generator(
