@@ -12,7 +12,11 @@ class scRNAParser():
     def get_samples(self):
         return set(self.data.colData["sample"])
 
+<<<<<<< HEAD
     def get_cells(self):
+=======
+    def get_cells(self, sample_id):
+>>>>>>> origin/nick-dev
         samples = self.data.colData["sample"]
         barcodes = self.data.colData["Barcode"]
         sample_barcodes = zip(barcodes, samples)
@@ -103,8 +107,15 @@ class scRNAParser():
     def get_celltype_probability(self, celltype):
         coldata = self.data.colData
         celltype = scRNAParser.unformat_celltype(celltype)
+<<<<<<< HEAD
         assert celltype in coldata, 'Cell type not found - {}'.format(celltype)
         return dict(zip(coldata["Barcode"], coldata[celltype]))
+=======
+        probabilities = [0.0 for _ in coldata["Barcode"]]
+        if celltype in coldata:
+            probabilities = coldata[celltype]
+        return dict(zip(coldata["Barcode"],probabilities))
+>>>>>>> origin/nick-dev
 
     def get_pathway(self, pathway):
         coldata = self.data.colData
