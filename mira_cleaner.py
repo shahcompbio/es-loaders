@@ -1,5 +1,6 @@
 from elasticsearch import Elasticsearch
 import sys
+import click
 
 SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
@@ -9,7 +10,12 @@ DASHBOARD_GENES_INDEX = "dashboard_genes_"
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 
 
-def clean_analysis(type, dashboard_id, host="localhost", port=9200):
+@click.command()
+@click.argument('dashboard_id')
+@click.argument('type')
+@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
+@click.option('--port', default=9200, help='Port for Elasticsearch server')
+def clean_analysis(dashboard_id, type, host, port):
     print("====================== " + dashboard_id)
     print("Cleaning records")
 
@@ -65,5 +71,4 @@ def fill_base_query(key, value):
 
 
 if __name__ == '__main__':
-    clean_analysis(sys.argv[1], sys.argv[2],
-                   host=sys.argv[3], port=sys.argv[4])
+    clean_analysis()

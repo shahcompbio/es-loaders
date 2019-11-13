@@ -3,6 +3,8 @@ import os
 from common.genemarkermatrix import GeneMarkerMatrix
 from utils.elasticsearch import load_records
 
+import click
+
 
 def get_rho(filename=None):
     if not filename:
@@ -23,7 +25,11 @@ def get_rho_all_markers():
     return dict(rho.marker_list)
 
 
-def load_rho(filename=None, host='localhost', port=9200):
+@click.command()
+@click.option('--filename', default=None, help='Path to marker yaml')
+@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
+@click.option('--port', default=9200, help='Port for Elasticsearch server')
+def load_rho(filename, host, port):
     print("======================= LOADING RHO")
     rho = get_rho_all_markers()
 

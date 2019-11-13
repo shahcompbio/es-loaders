@@ -3,9 +3,14 @@
 from elasticsearch import Elasticsearch
 from mira_cleaner import clean_analysis
 import sys
+import click
 
 
-def check_analyses(type, host="localhost", port=9200):
+@click.command()
+@click.argument('type')
+@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
+@click.option('--port', default=9200, help='Port for Elasticsearch server')
+def check_analyses(type, host, port):
     print("====================== CHECKING ANALYSIS")
 
     es = Elasticsearch(hosts=[{'host': host, 'port': port}])
@@ -28,4 +33,4 @@ def check_analyses(type, host="localhost", port=9200):
 
 
 if __name__ == "__main__":
-    check_analyses("sample")
+    check_analyses()

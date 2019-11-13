@@ -5,7 +5,8 @@ from common.scrna_parser import scRNAParser
 from utils.elasticsearch import load_records, load_record
 from mira.mira_metadata_parser import single_sample
 from rho_loader import get_rho_celltypes
-from utils.cli import CliClient
+
+import click
 
 SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
@@ -15,7 +16,13 @@ DASHBOARD_GENES_INDEX = "dashboard_genes_"
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 
 
-def load_analysis(filepath, dashboard_id, type, host="localhost", port=9200):
+@click.command()
+@click.argument('filepath')
+@click.argument('dashboard_id')
+@click.argument('type')
+@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
+@click.option('--port', default=9200, help='Port for Elasticsearch server')
+def load_analysis(filepath, dashboard_id, type, host, port):
     print("====================== " + dashboard_id)
     print("Opening File")
     data = scRNAParser(filepath + ".rdata")
@@ -113,7 +120,7 @@ def load_dashboard_redim(data, type, dashboard_id, host="localhost", port=9200):
     print("LOADING DASHBOARD RE-DIM: " + dashboard_id)
     cells = data.get_cells()
     redim = data.get_re_dim(
-        'scanorama_UMAP') if type is "patient" else data.get_re_dim()
+        'scanorama_UMAP') if type == "patient" else data.get_re_dim()
 
     redim_records = get_redim_record_generator(cells, redim, dashboard_id)
     print(" BEGINNING LOAD")
@@ -168,21 +175,5 @@ def load_dashboard_entry(type, dashboard_id, host="localhost", port=9200):
     load_record(DASHBOARD_ENTRY_INDEX, record, host=host, port=port)
 
 
-def main():
-    CLI = CliClient('Mira Loader')
-    CLI.add_filepath_argument(isFilepath=False)
-    CLI.add_elasticsearch_arguments()
-
-    mira_group = CLI.parser.add_argument_group("Mira")
-    mira_group.add_argument('-id', dest="mira_id", required=True)
-    mira_group.add_argument('-type', dest="mira_type", default="sample")
-    print("STARTING MIRA LOAD")
-    args = CLI.get_args()
-    print("STARTING LOAD")
-    print(args)
-    load_analysis(args.file_root, args.mira_id, args.mira_type,
-                  host=args.es_host, port=args.es_port)
-
-
 if __name__ == '__main__':
-    main()
+    load_analysis()
