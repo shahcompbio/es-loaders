@@ -5,8 +5,11 @@ from common.scrna_parser import scRNAParser
 from utils.elasticsearch import load_records, load_record
 from mira.mira_metadata_parser import single_sample
 from rho_loader import get_rho_celltypes
+from mira_cleaner import clean_analysis
 
 import click
+
+import traceback
 
 SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
@@ -16,17 +19,10 @@ DASHBOARD_GENES_INDEX = "dashboard_genes_"
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 
 
-@click.command()
-@click.argument('filepath')
-@click.argument('dashboard_id')
-@click.argument('type')
-@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
-@click.option('--port', default=9200, help='Port for Elasticsearch server')
 def load_analysis(filepath, dashboard_id, type, host, port):
     print("====================== " + dashboard_id)
     print("Opening File")
     data = scRNAParser(filepath + ".rdata")
-
     if type is "sample":
         print("Load Sample Data")
         load_sample_metadata(dashboard_id, host=host, port=port)
@@ -35,7 +31,6 @@ def load_analysis(filepath, dashboard_id, type, host, port):
 
     load_dashboard_redim(data, type, dashboard_id, host=host, port=port)
     load_dashboard_genes(data, dashboard_id, host=host, port=port)
-
     load_dashboard_entry(type, dashboard_id, host=host, port=port)
     # Need rho loader (this only has to be done once)
 
@@ -176,4 +171,4 @@ def load_dashboard_entry(type, dashboard_id, host="localhost", port=9200):
 
 
 if __name__ == '__main__':
-    load_analysis()
+    pass

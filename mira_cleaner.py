@@ -10,11 +10,6 @@ DASHBOARD_GENES_INDEX = "dashboard_genes_"
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 
 
-@click.command()
-@click.argument('dashboard_id')
-@click.argument('type')
-@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
-@click.option('--port', default=9200, help='Port for Elasticsearch server')
 def clean_analysis(dashboard_id, type, host, port):
     print("====================== " + dashboard_id)
     print("Cleaning records")
@@ -71,4 +66,4 @@ def fill_base_query(key, value):
 
 
 if __name__ == '__main__':
-    clean_analysis()
+    pass

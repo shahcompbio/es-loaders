@@ -6,10 +6,6 @@ import sys
 import click
 
 
-@click.command()
-@click.argument('type')
-@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
-@click.option('--port', default=9200, help='Port for Elasticsearch server')
 def check_analyses(type, host, port):
     print("====================== CHECKING ANALYSIS")
 
@@ -33,4 +29,4 @@ def check_analyses(type, host, port):
 
 
 if __name__ == "__main__":
-    check_analyses()
+    pass
