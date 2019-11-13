@@ -18,7 +18,7 @@ DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 def load_analysis(filepath, dashboard_id, type, host="localhost", port=9200):
     print("====================== " + dashboard_id)
     print("Opening File")
-    data = scRNAParser(filepath + dashboard_id + ".rdata")
+    data = scRNAParser(filepath + ".rdata")
 
     if type is "sample":
         print("Load Sample Data")
@@ -26,7 +26,7 @@ def load_analysis(filepath, dashboard_id, type, host="localhost", port=9200):
         load_sample_cells(data, dashboard_id, host=host, port=port)
         load_sample_statistics(data, dashboard_id, host=host, port=port)
 
-    load_dashboard_redim(data, dashboard_id, host=host, port=port)
+    load_dashboard_redim(data, type, dashboard_id, host=host, port=port)
     load_dashboard_genes(data, dashboard_id, host=host, port=port)
 
     load_dashboard_entry(type, dashboard_id, host=host, port=port)
@@ -109,10 +109,11 @@ def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabi
         yield record
 
 
-def load_dashboard_redim(data, dashboard_id, host="localhost", port=9200):
+def load_dashboard_redim(data, type, dashboard_id, host="localhost", port=9200):
     print("LOADING DASHBOARD RE-DIM: " + dashboard_id)
     cells = data.get_cells()
-    redim = data.get_re_dim()
+    redim = data.get_re_dim(
+        'scanorama_UMAP') if type is "patient" else data.get_re_dim()
 
     redim_records = get_redim_record_generator(cells, redim, dashboard_id)
     print(" BEGINNING LOAD")

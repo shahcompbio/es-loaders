@@ -16,8 +16,9 @@ pandas2ri.activate()
 
 SingleCellExperimentInterface = importr('SingleCellExperiment')
 SummarizedExperimentInterface = importr('SummarizedExperiment')
-BiocGenericsInterface         = importr('BiocGenerics')
-MatrixInterface               = importr('Matrix')
+BiocGenericsInterface = importr('BiocGenerics')
+MatrixInterface = importr('Matrix')
+
 
 class SingleCellExperiment(RS4):
 
@@ -35,15 +36,15 @@ class SingleCellExperiment(RS4):
         return data
 
     def save(self, filename):
-        robjects.r.assign("sce",self.rs4)
+        robjects.r.assign("sce", self.rs4)
         robjects.r("saveRDS(sce, file='{}')".format(filename))
 
     def getReducedDims(self, method, n=None):
-        if method.upper() not in self.reducedDims.keys():
+        if method not in self.reducedDims.keys():
             raise KeyError("{} was never computed.".format(method))
-        embedding = self.reducedDims[method.upper()]
+        embedding = self.reducedDims[method]
         barcodes = self.colData["Barcode"]
-        return numpy.array(embedding).reshape(len(barcodes),2)
+        return numpy.array(embedding).reshape(len(barcodes), 2)
 
     @classmethod
     def fromRS4(sce_class, rs4_object):
@@ -71,7 +72,8 @@ class SingleCellExperiment(RS4):
             value = rs4_object.slots[slot]
             if type(value) == robjects.vectors.ListVector:
                 try:
-                    value = dict(zip(list(value.names), map(list,list(value))))
+                    value = dict(
+                        zip(list(value.names), map(list, list(value))))
                     for column, data in value.items():
                         unpacked_object[column] = data
                 except Exception as e:
@@ -96,7 +98,7 @@ class SingleCellExperiment(RS4):
         assert "Barcode" in coldata, "No Barcodes Found."
         barcodes = coldata["Barcode"]
         assert (len(genes), len(barcodes)) == assay.shape
-        assay_df = pandas.DataFrame(data=assay,index=genes,columns=barcodes)
+        assay_df = pandas.DataFrame(data=assay, index=genes, columns=barcodes)
         return assay_df
 
     @property
@@ -136,7 +138,7 @@ class SingleCellExperiment(RS4):
             for row in range(begin_pointer, pointer):
                 col_ind[row] = column
             begin_pointer = pointer
-        return csr_matrix((data,(row_ind,col_ind)),shape=(nrows,len(col_pointers)-1))
+        return csr_matrix((data, (row_ind, col_ind)), shape=(nrows, len(col_pointers)-1))
 
     @staticmethod
     def CSRtoDCG(sparse_matrix):
@@ -152,12 +154,12 @@ class SingleCellExperiment(RS4):
         for assay, label in zip(list_vector, list_vector.names):
             if type(assay) == robjects.methods.RS4:
                 non_zero_elements = assay.slots["x"]
-                row_numbers =assay.slots["i"]
+                row_numbers = assay.slots["i"]
                 column_pointers = assay.slots["p"]
                 nrows = len(list(assay.slots["Dimnames"])[0])
-                self._assays[label] = SingleCellExperiment.DCGtoCSR(non_zero_elements, row_numbers, column_pointers, nrows)
+                self._assays[label] = SingleCellExperiment.DCGtoCSR(
+                    non_zero_elements, row_numbers, column_pointers, nrows)
             elif type(assay) == robjects.vectors.Matrix:
                 self._assays[label] = csr_matrix(pandas2ri.ri2py(assay))
             else:
                 self._assays[label] = assay
-
