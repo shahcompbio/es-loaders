@@ -1,6 +1,7 @@
 import pickle
 import os
 import collections
+import pandas as pd
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -50,6 +51,22 @@ def patient_samples(patient_id):
 
 def single_sample(nick_unique_id):
     return all_samples()[nick_unique_id]
+
+
+def all_sample_ids():
+    return [sample_id
+            for sample_id, fields in all_samples().items()]
+
+
+def all_patient_sort_ids():
+    samples = [fields for sample_id, fields in all_samples().items()]
+    df = pd.DataFrame.from_records(samples)
+
+    patient_df = df[['patient_id', 'sort_parameters']].drop_duplicates()
+    patient_df['sort_parameters'] = patient_df['sort_parameters'].map(
+        {'singlet, live, CD45+': 'CD45P', 'singlet, live, CD45-': 'CD45N', 'singlet, live, U': 'U'})
+
+    return [row[0] + "_" + row[1] for row in df.values.tolist()]
 
 
 if __name__ == '__main__':

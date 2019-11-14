@@ -4,7 +4,7 @@ import traceback
 from mira_loader import load_analysis as _load_analysis
 from mira_cleaner import clean_analysis as _clean_analysis
 from mira_data_checker import check_analyses
-from mira_utils import get_new_sample_ids
+from mira_utils import get_new_ids
 
 
 @click.group()
@@ -31,27 +31,28 @@ def load_analysis(ctx, filepath, dashboard_id, type):
                         host=ctx.obj['host'], port=ctx.obj['port'])
 
 
-# TODO: Add patient level bulk loading
 @main.command()
 @click.argument('dir')
+@click.argument('type')
 @click.pass_context
-def load_new_samples(ctx, dir):
+def load_new_ids_by_type(ctx, dir, type):
     host = ctx.obj['host']
     port = ctx.obj['port']
 
-    sample_ids = get_new_sample_ids(host=host, port=port)
+    dashboard_ids = get_new_ids(type, host=host, port=port)
 
-    for sample_id in sample_ids:
+    for dashboard_id in dashboard_ids:
         try:
+            # file path is also dependent on type?
             _load_analysis(
-                dir + sample_id, sample_id, "sample", host=host, port=port)
+                dir + dashboard_id, dashboard_id, type, host=host, port=port)
         except KeyboardInterrupt as err:
             traceback.print_tb(err.__traceback__)
-            _clean_analysis(sample_id, "sample", host=host, port=port)
+            _clean_analysis(dashboard_id, type, host=host, port=port)
             break
         except Exception as err:
             traceback.print_tb(err.__traceback__)
-            _clean_analysis(sample_id, "sample",
+            _clean_analysis(dashboard_id, type,
                             host=ctx.obj['host'], port=ctx.obj['port'])
 
 
