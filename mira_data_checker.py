@@ -2,6 +2,7 @@
 
 from elasticsearch import Elasticsearch
 from mira_cleaner import clean_analysis
+from mira_loader import load_dashboard_entry
 import sys
 import click
 
@@ -26,6 +27,21 @@ def check_analyses(type, host, port):
     for dashboard_id in duplicate_ids:
         print(dashboard_id)
         clean_analysis(type, dashboard_id, host=host, port=port)
+
+
+def convert_metadata(host, port):
+    QUERY = {
+        "size": 10000
+    }
+
+    es = Elasticsearch(hosts=[{'host': host, 'port': port}])
+    result = es.search(index="sample_metadata", body=QUERY)
+
+    all_ids = [record["_source"]["sample_id"]
+               for record in result["hits"]["hits"]]
+
+    for dashboard_id in all_ids:
+        load_dashboard_entry("sample", dashboard_id, host=host, port=port)
 
 
 if __name__ == "__main__":

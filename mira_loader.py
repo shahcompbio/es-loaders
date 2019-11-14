@@ -3,7 +3,7 @@ import math
 import yaml
 from common.scrna_parser import scRNAParser
 from utils.elasticsearch import load_records, load_record
-from mira.mira_metadata_parser import single_sample
+from mira.mira_metadata_parser import single_sample, patient_samples
 from rho_loader import get_rho_celltypes
 from mira_cleaner import clean_analysis
 
@@ -25,7 +25,6 @@ def load_analysis(filepath, dashboard_id, type, host, port):
     data = scRNAParser(filepath + ".rdata")
     if type is "sample":
         print("Load Sample Data")
-        load_sample_metadata(dashboard_id, host=host, port=port)
         load_sample_cells(data, dashboard_id, host=host, port=port)
         load_sample_statistics(data, dashboard_id, host=host, port=port)
 
@@ -33,27 +32,6 @@ def load_analysis(filepath, dashboard_id, type, host, port):
     load_dashboard_genes(data, dashboard_id, host=host, port=port)
     load_dashboard_entry(type, dashboard_id, host=host, port=port)
     # Need rho loader (this only has to be done once)
-
-
-def load_sample_metadata(sample_id, host="localhost", port=9200):
-    print("LOADING SAMPLE METADATA: " + sample_id)
-    metadata = single_sample(sample_id)
-
-    sort_status = metadata["sort_parameters"].split(",")[2].strip()
-    sort = {"U": "unsorted", "CD45+": "CD45P",
-            "CD45-": "CD45N"}[sort_status]
-
-    record = {
-        "sample_id": sample_id,
-        "patient_id": metadata["patient_id"],  # parse from sample_id
-        "surgery": metadata["time"],  # parse S1/S2 from sample_id
-        "treatment": metadata["therapy"],  # pre | post
-        "site": metadata["tumour_site"],  # parse from sample_id
-        "sort": sort  # parse from sample_id
-    }
-    print(" BEGINNING LOAD")
-    print(record)
-    load_record(SAMPLE_METADATA_INDEX, record, host=host, port=port)
 
 
 def load_sample_statistics(data, sample_id, host="localhost", port=9200):
@@ -161,14 +139,36 @@ def get_gene_record_generator(cells, gene_matrix, dashboard_id):
 
 def load_dashboard_entry(type, dashboard_id, host="localhost", port=9200):
     print("LOADING DASHBOARD ENTRY: " + dashboard_id)
+
+    metadata = _get_metadata(type, dashboard_id)
+
     record = {
+        "dashboard_id": dashboard_id,
         "type": type,
-        "dashboard_id": dashboard_id
+        "patient_id": metadata[0]["patient_id"],
+        "sort": _format_sort(metadata[0]["sort_parameters"]),
+        "sample_ids": [datum["nick_unique_id"] for datum in metadata],
+        "surgery": list(set([datum["time"] for datum in metadata])),
+        "treatment": list(set([datum["therapy"] for datum in metadata])),
+        "site": list(set([datum["tumour_site"] for datum in metadata]))
     }
     print(" BEGINNING LOAD")
     print(record)
     load_record(DASHBOARD_ENTRY_INDEX, record, host=host, port=port)
 
 
+def _get_metadata(type, dashboard_id):
+    if type == "sample":
+        return [single_sample(dashboard_id)]
+    else:  # assume patient
+        [patient_id, sort] = dashboard_id.split("_")
+        samples = patient_samples(patient_id)
+        return [sample for sample in samples if _format_sort(sample["sort_parameters"]) == sort]
+
+
+def _format_sort(sort):
+    return {'singlet, live, CD45+': 'CD45P', 'singlet, live, CD45-': 'CD45N', 'singlet, live, U': 'U'}[sort]
+
+
 if __name__ == '__main__':
-    pass
+    load_dashboard_entry(sys.argv[1], sys.argv[2])
