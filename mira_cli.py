@@ -56,6 +56,8 @@ def load_new_ids_by_type(ctx, dir, type):
                             host=ctx.obj['host'], port=ctx.obj['port'])
 
 
+@main.command()
+@click.pass_context
 def reload_metadata(ctx):
     host = ctx.obj['host']
     port = ctx.obj['port']
