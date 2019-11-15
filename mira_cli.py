@@ -25,10 +25,10 @@ def load_analysis(ctx, filepath, dashboard_id, type):
     try:
         _load_analysis(filepath, dashboard_id, type,
                        host=ctx.obj['host'], port=ctx.obj['port'])
-    except Exception as err:
-        traceback.print_tb(err.__traceback__)
+    except:
         _clean_analysis(dashboard_id, type,
                         host=ctx.obj['host'], port=ctx.obj['port'])
+        raise
 
 
 @main.command()
@@ -50,10 +50,10 @@ def load_new_ids_by_type(ctx, dir, type):
             traceback.print_tb(err.__traceback__)
             _clean_analysis(dashboard_id, type, host=host, port=port)
             break
-        except Exception as err:
-            traceback.print_tb(err.__traceback__)
+        except:
             _clean_analysis(dashboard_id, type,
                             host=ctx.obj['host'], port=ctx.obj['port'])
+            raise
 
 
 @main.command()
