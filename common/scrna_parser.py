@@ -58,7 +58,7 @@ class scRNAParser():
         rowdata = self.data.rowData
         assay = self.data.assays[assay]
         if type(assay) == scipy.sparse.csr.csr_matrix:
-            assay = assay.todense()
+            assay = assay.tocsr()
         matrix = assay.tolist()
         assay_matrix = collections.defaultdict(dict)
         for symbol, row in zip(rowdata["Symbol"], matrix):
