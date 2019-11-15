@@ -1,5 +1,6 @@
 import numpy
 import collections
+import scipy
 
 from common.singlecellexperiment import SingleCellExperiment
 
@@ -55,7 +56,10 @@ class scRNAParser():
     def get_gene_matrix(self, assay="logcounts"):
         coldata = self.data.colData
         rowdata = self.data.rowData
-        matrix = self.data.assays[assay].tolist()
+        assay = self.data.assays[assay]
+        if type(assay) == scipy.sparse.csr.csr_matrix:
+            assay = assay.todense()
+        matrix = assay.tolist()
         assay_matrix = collections.defaultdict(dict)
         for symbol, row in zip(rowdata["Symbol"], matrix):
             for barcode, cell in zip(coldata["Barcode"], row):
@@ -115,7 +119,7 @@ class scRNAParser():
 
 
 if __name__ == '__main__':
-    parser = scRNAParser("SPECTRUM-OV-002_S1_CD45N_RIGHT_ADNEXA.rdata")
+    parser = scRNAParser("SPECTRUM-OV-037_S1_CD45P_ASCITES.rdata")
     sample_id = parser.get_samples()
 
     site = parser.data.colData["site"]
