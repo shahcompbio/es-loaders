@@ -2,8 +2,8 @@ import click
 import traceback
 
 from mira_loader import load_analysis as _load_analysis
-from mira_cleaner import clean_analysis as _clean_analysis, convert_metadata
-from mira_data_checker import check_analyses
+from mira_cleaner import clean_analysis as _clean_analysis
+from mira_data_checker import convert_metadata, check_analyses
 from mira_utils import get_new_ids
 
 
