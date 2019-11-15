@@ -22,7 +22,8 @@ DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 def load_analysis(filepath, dashboard_id, type, host, port):
     print("====================== " + dashboard_id)
     print("Opening File")
-    data = scRNAParser(filepath + ".rdata")
+    file = _get_filepath(filepath, dashboard_id, type)
+    data = scRNAParser(file)
     if type is "sample":
         print("Load Sample Data")
         load_sample_cells(data, dashboard_id, host=host, port=port)
@@ -32,6 +33,15 @@ def load_analysis(filepath, dashboard_id, type, host, port):
     load_dashboard_genes(data, dashboard_id, host=host, port=port)
     load_dashboard_entry(type, dashboard_id, host=host, port=port)
     # Need rho loader (this only has to be done once)
+
+
+def _get_filepath(filepath, dashboard_id, type):
+    if filepath.endswith(".rdata"):
+        return filepath
+    elif type == "sample":
+        return filepath + dashboard_id + ".rdata"
+    elif type == "patient":
+        return filepath + dashboard_id + "_scanorama.rdata"
 
 
 def load_sample_statistics(data, sample_id, host="localhost", port=9200):
