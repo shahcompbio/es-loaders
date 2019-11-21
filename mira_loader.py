@@ -24,7 +24,7 @@ def load_analysis(filepath, dashboard_id, type, host, port):
     print("Opening File")
     file = _get_filepath(filepath, dashboard_id, type)
     data = scRNAParser(file)
-    if type is "sample":
+    if type == "sample":
         print("Load Sample Data")
         load_sample_cells(data, dashboard_id, host=host, port=port)
         load_sample_statistics(data, dashboard_id, host=host, port=port)
