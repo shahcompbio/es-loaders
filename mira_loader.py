@@ -102,8 +102,8 @@ def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabi
 def load_dashboard_redim(data, type, dashboard_id, host="localhost", port=9200):
     print("LOADING DASHBOARD RE-DIM: " + dashboard_id)
     cells = data.get_cells()
-    redim = data.get_re_dim(
-        'scanorama_UMAP') if type == "patient" else data.get_re_dim()
+    redim = data.get_dim_red(
+        'scanorama_UMAP') if type == "patient" else data.get_dim_red()
 
     redim_records = get_redim_record_generator(cells, redim, dashboard_id)
     print(" BEGINNING LOAD")
