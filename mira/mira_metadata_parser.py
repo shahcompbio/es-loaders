@@ -6,6 +6,8 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
+import csv
+
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 SAMPLE_SPREADSHEET_ID = '1plhIL1rH2IuQ8b_komjAUHKKrnYPNDyhvNNRsTv74u8'
 SAMPLE_RANGE_NAME = 'sample_metadata!A1:L'
@@ -36,14 +38,17 @@ def open_file():
 
 
 def all_samples():
-    values = open_file()
+    #values = open_file()
+    with open('metadata.csv') as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        samples = collections.defaultdict(dict)
 
-    samples = collections.defaultdict(dict)
-    header = values.pop(0)
-    for row in values:
-        sample = dict(zip(header, row))
-        samples[sample["nick_unique_id"]] = sample
-    return samples
+        #header = values.pop(0)
+        header = next(csv_reader, None)
+        for row in csv_reader:
+            sample = dict(zip(header, row))
+            samples[sample["nick_unique_id"]] = sample
+        return samples
 
 
 def patient_samples(patient_id, sheet=None):
