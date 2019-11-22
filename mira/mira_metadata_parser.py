@@ -40,8 +40,8 @@ def all_samples():
     return samples
 
 
-def patient_samples(patient_id):
-    samples = all_samples()
+def patient_samples(patient_id, sheet=None):
+    samples = sheet if sheet is not None else all_samples()
     valid_samples = []
     for unique_id, fields in samples.items():
         if fields["patient_id"] == patient_id:
@@ -49,8 +49,9 @@ def patient_samples(patient_id):
     return valid_samples
 
 
-def single_sample(nick_unique_id):
-    return all_samples()[nick_unique_id]
+def single_sample(nick_unique_id, sheet=None):
+    samples = sheet if sheet is not None else all_samples()
+    return samples[nick_unique_id]
 
 
 def all_sample_ids():

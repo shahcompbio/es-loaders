@@ -147,10 +147,10 @@ def get_gene_record_generator(cells, gene_matrix, dashboard_id):
             yield record
 
 
-def load_dashboard_entry(type, dashboard_id, host="localhost", port=9200):
+def load_dashboard_entry(type, dashboard_id, sheet=None, host="localhost", port=9200):
     print("LOADING DASHBOARD ENTRY: " + dashboard_id)
 
-    metadata = _get_metadata(type, dashboard_id)
+    metadata = _get_metadata(type, dashboard_id, sheet)
 
     record = {
         "dashboard_id": dashboard_id,
@@ -167,12 +167,12 @@ def load_dashboard_entry(type, dashboard_id, host="localhost", port=9200):
     load_record(DASHBOARD_ENTRY_INDEX, record, host=host, port=port)
 
 
-def _get_metadata(type, dashboard_id):
+def _get_metadata(type, dashboard_id, sheet):
     if type == "sample":
-        return [single_sample(dashboard_id)]
+        return [single_sample(dashboard_id, sheet=sheet)]
     else:  # assume patient
         [patient_id, sort] = dashboard_id.split("_")
-        samples = patient_samples(patient_id)
+        samples = patient_samples(patient_id, sheet=sheet)
         return [sample for sample in samples if _format_sort(sample["sort_parameters"]) == sort]
 
 

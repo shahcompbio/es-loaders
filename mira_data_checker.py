@@ -3,6 +3,7 @@
 from elasticsearch import Elasticsearch
 from mira_cleaner import clean_analysis
 from mira_loader import load_dashboard_entry
+from mira.mira_metadata_parser import all_samples
 import sys
 import click
 
@@ -33,15 +34,16 @@ def convert_metadata(host, port):
     QUERY = {
         "size": 10000
     }
-
     es = Elasticsearch(hosts=[{'host': host, 'port': port}])
     result = es.search(index="sample_metadata", body=QUERY)
 
     all_ids = [record["_source"]["sample_id"]
                for record in result["hits"]["hits"]]
 
+    sheet = all_samples()
     for dashboard_id in all_ids:
-        load_dashboard_entry("sample", dashboard_id, host=host, port=port)
+        load_dashboard_entry("sample", dashboard_id,
+                             sheet=sheet, host=host, port=port)
 
 
 if __name__ == "__main__":
