@@ -22,13 +22,11 @@ class scRNAParser():
             lambda cell: cell[0] in barcodes, sample_barcodes)
         return dict(sample_barcodes)
 
-    def get_dim_red(self, sample_id=None, embedding="UMAP", min_neighbors=5, neighbor_dist=1):
-        barcodes = self.get_cells(sample_id=sample_id)
+    def get_dim_red(self, embedding="UMAP", min_neighbors=5, neighbor_dist=1):
+        barcodes = self.get_cells()
         _embedding = self.data.getReducedDims(embedding)
         embedding = zip(barcodes, _embedding)
-        if sample_id:
-            embedding = filter(lambda cell: cell[0] in barcodes, embedding)
-            _embedding = embedding.values()
+\
         point_tree = spatial.cKDTree(_embedding)
         filtered_embedding = dict()
         for barcode, point in embedding:
@@ -132,7 +130,7 @@ if __name__ == '__main__':
     parser = scRNAParser("SPECTRUM-OV-041_S1_CD45N_INFRACOLIC_OMENTUM.rdata")
     sample_id = parser.get_samples()
 
-    #site = parser.data.colData["site"]
+    # site = parser.data.colData["site"]
     print(parser.get_dim_red())
     # print(parser.get_gene_matrix("SPECTRUM-OV-041_S1_CD45N_INFRACOLIC_OMENTUM"))
     # site = parser.data.colData["cell_type"]
