@@ -1,6 +1,7 @@
 import numpy
 import collections
 import scipy
+import scipy.spatial as spatial
 
 from common.singlecellexperiment import SingleCellExperiment
 
@@ -21,11 +22,20 @@ class scRNAParser():
             lambda cell: cell[0] in barcodes, sample_barcodes)
         return dict(sample_barcodes)
 
-    def get_re_dim(self, embedding="UMAP"):
-        barcodes = self.get_cells()
-        embedding = zip(barcodes, self.data.getReducedDims(embedding))
-        sample_embedding = filter(lambda cell: cell[0] in barcodes, embedding)
-        return dict(sample_embedding)
+    def get_dim_red(self, sample_id=None, embedding="UMAP", min_neighbors=5, neighbor_dist=1):
+        barcodes = self.get_cells(sample_id=sample_id)
+        _embedding = self.data.getReducedDims(embedding)
+        embedding = zip(barcodes, _embedding)
+        if sample_id:
+            embedding = filter(lambda cell: cell[0] in barcodes, embedding)
+            _embedding = embedding.values()
+        point_tree = spatial.cKDTree(_embedding)
+        filtered_embedding = dict()
+        for barcode, point in embedding:
+            neighbors = point_tree.query_ball_point(point, neighbor_dist)
+            if len(neighbors) > min_neighbors:
+                filtered_embedding[barcode] = point
+        return dict(filtered_embedding)
 
     @staticmethod
     def format_celltype(cell_type):
@@ -56,14 +66,14 @@ class scRNAParser():
     def get_gene_matrix(self, assay="logcounts"):
         coldata = self.data.colData
         rowdata = self.data.rowData
-        assay = self.data.assays[assay]
-        if type(assay) == scipy.sparse.csr.csr_matrix:
-            assay = assay.tocsr()
-        matrix = assay.tolist()
+        matrix = self.data.assays[assay]
         assay_matrix = collections.defaultdict(dict)
-        for symbol, row in zip(rowdata["Symbol"], matrix):
-            for barcode, cell in zip(coldata["Barcode"], row):
+        for i in range(matrix.shape[0]):
+            for j in range(matrix.shape[1]):
+                cell = matrix[i, j]
                 if float(cell) != 0.0:
+                    symbol = rowdata["Symbol"][i]
+                    barcode = coldata["Barcode"][j]
                     assay_matrix[barcode][symbol] = cell
         return dict(assay_matrix)
 
@@ -119,17 +129,21 @@ class scRNAParser():
 
 
 if __name__ == '__main__':
-    parser = scRNAParser("SPECTRUM-OV-037_S1_CD45P_ASCITES.rdata")
+    parser = scRNAParser("SPECTRUM-OV-041_S1_CD45N_INFRACOLIC_OMENTUM.rdata")
     sample_id = parser.get_samples()
 
-    site = parser.data.colData["site"]
+    #site = parser.data.colData["site"]
+    print(parser.get_dim_red())
+    # print(parser.get_gene_matrix("SPECTRUM-OV-041_S1_CD45N_INFRACOLIC_OMENTUM"))
+    # site = parser.data.colData["cell_type"]
+    # print(site)
     # print(site)
 
     # print(parser.get_cells(sample_id))
     # print(parser.get_dim_red(sample_id))
     # print(parser.get_celltypes(sample_id))
     # print(parser.get_assays(sample_id))
-    print(parser.get_gene_matrix(sample_id))
+    # print(parser.get_gene_matrix(sample_id))
     # print(parser.get_statistics(sample_id))
     # print(parser.get_celltype_probability("Monocyte/Macrophage"))
     # print(parser.get_pathway("repairtype"))
