@@ -26,7 +26,7 @@ class scRNAParser():
         barcodes = self.get_cells()
         _embedding = self.data.getReducedDims(embedding)
         embedding = zip(barcodes, _embedding)
-\
+
         point_tree = spatial.cKDTree(_embedding)
         filtered_embedding = dict()
         for barcode, point in embedding:
