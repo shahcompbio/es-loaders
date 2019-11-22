@@ -11,7 +11,7 @@ SAMPLE_SPREADSHEET_ID = '1plhIL1rH2IuQ8b_komjAUHKKrnYPNDyhvNNRsTv74u8'
 SAMPLE_RANGE_NAME = 'sample_metadata!A1:L'
 
 
-def all_samples():
+def open_file():
     creds = None
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
@@ -31,6 +31,12 @@ def all_samples():
     result = sheet.values().get(spreadsheetId=SAMPLE_SPREADSHEET_ID,
                                 range=SAMPLE_RANGE_NAME).execute()
     values = result.get('values', [])
+
+    return values
+
+
+def all_samples():
+    values = open_file()
 
     samples = collections.defaultdict(dict)
     header = values.pop(0)
