@@ -45,7 +45,7 @@ def load_new_ids_by_type(ctx, dir, type):
         try:
             # file path is also dependent on type?
             _load_analysis(
-                dir + dashboard_id, dashboard_id, type, host=host, port=port)
+                dir, dashboard_id, type, host=host, port=port)
         except KeyboardInterrupt as err:
             traceback.print_tb(err.__traceback__)
             _clean_analysis(dashboard_id, type, host=host, port=port)
