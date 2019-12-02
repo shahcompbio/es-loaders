@@ -83,6 +83,9 @@ class ElasticsearchClient():
     def load_bulk_parallel(self, index, generator):
 
         for success, info in helpers.parallel_bulk(self.es, generator,
-                                                   index=index, doc_type="_doc"):
+                                                   index=index, doc_type="_doc",
+                                                   chunk_size=100):
+            if success:
+                print("Done", info)
             if not success:
                 print('Doc failed', info)
