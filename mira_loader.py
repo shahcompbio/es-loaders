@@ -1,6 +1,7 @@
 import sys
 import math
 import yaml
+import logging
 from common.scrna_parser import scRNAParser
 from utils.elasticsearch import load_records, load_record
 from mira.mira_metadata_parser import single_sample, patient_samples
@@ -9,23 +10,22 @@ from mira_cleaner import clean_analysis
 
 import click
 
-import traceback
-
 SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
 SAMPLE_CELLS_INDEX = "sample_cells"
 DASHBOARD_REDIM_INDEX = "dashboard_redim_"
 DASHBOARD_GENES_INDEX = "dashboard_genes_"
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
+logger = logging.getLogger('mira_loading')
 
 
 def load_analysis(filepath, dashboard_id, type, host, port):
-    print("====================== " + dashboard_id)
-    print("Opening File")
+    logger.info("====================== " + dashboard_id)
+    logger.info("Opening File")
     file = _get_filepath(filepath, dashboard_id, type)
     data = scRNAParser(file)
     if type == "sample":
-        print("Load Sample Data")
+        logger.info("Load Sample Data")
         load_sample_cells(data, dashboard_id, host=host, port=port)
         load_sample_statistics(data, dashboard_id, host=host, port=port)
 
@@ -46,11 +46,11 @@ def _get_filepath(filepath, dashboard_id, type):
 
 def load_sample_statistics(data, sample_id, host="localhost", port=9200):
 
-    print("LOADING SAMPLE STATS: " + sample_id)
+    logger.info("LOADING SAMPLE STATS: " + sample_id)
     statistics = data.get_statistics()
 
     stats_records = get_stats_records_generator(statistics, sample_id)
-    print(" BEGINNING LOAD")
+    logger.info(" BEGINNING LOAD")
     load_records(SAMPLE_STATS_INDEX, stats_records, host=host, port=port)
 
 
@@ -65,7 +65,7 @@ def get_stats_records_generator(stats, sample_id):
 
 
 def load_sample_cells(data, sample_id, host="localhost", port=9200):
-    print("LOADING SAMPLE CELLS: " + sample_id)
+    logger.info("LOADING SAMPLE CELLS: " + sample_id)
     cells = data.get_cells()
     celltypes = data.get_celltypes()
 
@@ -74,7 +74,7 @@ def load_sample_cells(data, sample_id, host="localhost", port=9200):
 
     cell_records = get_sample_cells_generator(
         cells, celltypes, rho_celltypes, celltype_probabilities, sample_id)
-    print(" BEGINNING LOAD")
+    logger.info(" BEGINNING LOAD")
     load_records(SAMPLE_CELLS_INDEX, cell_records, host=host, port=port)
 
 
@@ -100,13 +100,13 @@ def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabi
 
 
 def load_dashboard_redim(data, type, dashboard_id, host="localhost", port=9200):
-    print("LOADING DASHBOARD RE-DIM: " + dashboard_id)
+    logger.info("LOADING DASHBOARD RE-DIM: " + dashboard_id)
     cells = data.get_cells()
     redim = data.get_dim_red(
         'scanorama_UMAP') if type == "patient" else data.get_dim_red()
 
     redim_records = get_redim_record_generator(cells, redim, dashboard_id)
-    print(" BEGINNING LOAD")
+    logger.info(" BEGINNING LOAD")
     load_records(DASHBOARD_REDIM_INDEX + dashboard_id.lower(),
                  redim_records, host=host, port=port)
 
@@ -123,12 +123,12 @@ def get_redim_record_generator(cells, redim, dashboard_id):
 
 
 def load_dashboard_genes(data, dashboard_id, host="localhost", port=9200):
-    print("LOADING DASHBOARD GENES: " + dashboard_id)
+    logger.info("LOADING DASHBOARD GENES: " + dashboard_id)
     cells = data.get_cells()
     genes = data.get_gene_matrix()
 
     gene_records = get_gene_record_generator(cells, genes, dashboard_id)
-    print(" BEGINNING LOAD")
+    logger.info(" BEGINNING LOAD")
     load_records(DASHBOARD_GENES_INDEX + dashboard_id.lower(),
                  gene_records, host=host, port=port)
 
@@ -148,7 +148,7 @@ def get_gene_record_generator(cells, gene_matrix, dashboard_id):
 
 
 def load_dashboard_entry(type, dashboard_id, sheet=None, host="localhost", port=9200):
-    print("LOADING DASHBOARD ENTRY: " + dashboard_id)
+    logger.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
 
     metadata = _get_metadata(type, dashboard_id, sheet)
 
@@ -162,8 +162,8 @@ def load_dashboard_entry(type, dashboard_id, sheet=None, host="localhost", port=
         "treatment": list(set([datum["therapy"] for datum in metadata])),
         "site": list(set([datum["tumour_site"] for datum in metadata]))
     }
-    print(" BEGINNING LOAD")
-    print(record)
+    logger.info(" BEGINNING LOAD")
+    logger.info(record)
     load_record(DASHBOARD_ENTRY_INDEX, record, host=host, port=port)
 
 

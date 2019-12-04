@@ -2,6 +2,9 @@ from elasticsearch import Elasticsearch
 import sys
 import click
 
+import logging
+logger = logging.getLogger(__name__)
+
 SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
 SAMPLE_CELLS_INDEX = "sample_cells"
@@ -11,31 +14,31 @@ DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 
 
 def clean_analysis(dashboard_id, type, host, port):
-    print("====================== " + dashboard_id)
-    print("Cleaning records")
+    logger.info("====================== " + dashboard_id)
+    logger.info("Cleaning records")
 
     if type == "sample":
-        print("DELETE SAMPLE METADATA")
+        logger.info("DELETE SAMPLE METADATA")
         delete_records(SAMPLE_METADATA_INDEX, "sample_id",
                        dashboard_id, host=host, port=port)
 
-        print("DELETE SAMPLE CELLS")
+        logger.info("DELETE SAMPLE CELLS")
         delete_records(SAMPLE_CELLS_INDEX, "sample_id",
                        dashboard_id, host=host, port=port)
 
-        print("DELETE SAMPLE STATS")
+        logger.info("DELETE SAMPLE STATS")
         delete_records(SAMPLE_STATS_INDEX, "sample_id",
                        dashboard_id, host=host, port=port)
 
-    print("DELETE DASHBOARD REDIM")
+    logger.info("DELETE DASHBOARD REDIM")
     delete_index(DASHBOARD_REDIM_INDEX +
                  dashboard_id.lower(), host=host, port=port)
 
-    print("DELETE DASHBOARD GENES")
+    logger.info("DELETE DASHBOARD GENES")
     delete_index(DASHBOARD_GENES_INDEX +
                  dashboard_id.lower(), host=host, port=port)
 
-    print("DELETE DASHBOARD_ENTRY")
+    logger.info("DELETE DASHBOARD_ENTRY")
     delete_records(DASHBOARD_ENTRY_INDEX, "dashboard_id",
                    dashboard_id, host=host, port=port)
 

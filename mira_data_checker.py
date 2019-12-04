@@ -7,9 +7,12 @@ from mira.mira_metadata_parser import all_samples
 import sys
 import click
 
+import logging
+logger = logging.getLogger('mira_loading')
+
 
 def check_analyses(type, host, port):
-    print("====================== CHECKING ANALYSIS")
+    logger.info("====================== CHECKING ANALYSIS")
 
     es = Elasticsearch(hosts=[{'host': host, 'port': port}])
 
@@ -26,7 +29,7 @@ def check_analyses(type, host, port):
         dashboard_id for dashboard_id in unique_ids if all_ids.count(dashboard_id) > 1]
 
     for dashboard_id in duplicate_ids:
-        print(dashboard_id)
+        logger.info(dashboard_id)
         clean_analysis(type, dashboard_id, host=host, port=port)
 
 

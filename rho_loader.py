@@ -5,6 +5,9 @@ from utils.elasticsearch import load_records
 
 import click
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def get_rho(filename=None):
     if not filename:
@@ -30,12 +33,12 @@ def get_rho_all_markers():
 @click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
 @click.option('--port', default=9200, help='Port for Elasticsearch server')
 def load_rho(filename, host, port):
-    print("======================= LOADING RHO")
+    logger.info("======================= LOADING RHO")
     rho = get_rho_all_markers()
 
     records = []
     for celltype, markers in rho.items():
-        print(celltype + ": " + str(len(markers)) + " markers")
+        logger.info(celltype + ": " + str(len(markers)) + " markers")
         celltype_records = [{"celltype": celltype,
                              "marker": marker} for marker in markers]
 

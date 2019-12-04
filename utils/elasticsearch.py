@@ -3,6 +3,9 @@ from elasticsearch import helpers
 
 import types
 
+import logging
+logger = logging.getLogger('mira_loading')
+
 
 def load_record(index, record, host="localhost", port=9200):
     es = ElasticsearchClient(host=host, port=port)
@@ -78,13 +81,18 @@ class ElasticsearchClient():
             helpers.bulk(self.es, records, index=index,
                          doc_type="_doc")
         except Exception as e:
-            print("ERROR:", e)
+            logger.exception("ERROR WHILE LOADING BULK")
 
     def load_bulk_parallel(self, index, generator):
 
         for success, info in helpers.parallel_bulk(self.es, generator,
                                                    index=index, doc_type="_doc",
                                                    chunk_size=500):
+            if success and logger.isEnabledFor(logging.DEBUG):
+                count = self.es.count(index=index)
+                logger.debug("Doc count in " + index +
+                             " : " + str(count["count"]))
 
             if not success:
-                print('Doc failed', info)
+                logger.error(info)
+                logger.exception('Doc failed in parallel loading')
