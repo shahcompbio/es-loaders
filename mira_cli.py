@@ -24,7 +24,7 @@ def main(ctx, host, port, debug):
 
     os.makedirs('logs/', exist_ok=True)
     handler = logging.handlers.TimedRotatingFileHandler(
-        'logs/logfile.log', 'Midnight', 1)
+        'logs/logfile.log', 'midnight', 1)
     handler.suffix = "%Y-%m-%d"
 
     logging.basicConfig(format=LOGGING_FORMAT, handlers=[
