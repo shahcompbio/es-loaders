@@ -10,10 +10,12 @@ from mira_cleaner import clean_analysis
 
 import click
 
-SAMPLE_METADATA_INDEX = "sample_metadata"
+# SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
-SAMPLE_CELLS_INDEX = "sample_cells"
-DASHBOARD_REDIM_INDEX = "dashboard_redim_"
+# SAMPLE_CELLS_INDEX = "sample_cells"
+# DASHBOARD_REDIM_INDEX = "dashboard_redim_"
+
+DASHBOARD_CELLS_INDEX = "dashboard_cells"
 DASHBOARD_GENES_INDEX = "dashboard_genes_"
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 logger = logging.getLogger('mira_loading')
@@ -21,16 +23,16 @@ logger = logging.getLogger('mira_loading')
 
 def load_analysis(filepath, dashboard_id, type, host, port):
     logger.info("====================== " + dashboard_id)
-    logger.info("Opening File")
     file = _get_filepath(filepath, dashboard_id, type)
+    logger.info("Opening File: " + file)
     data = scRNAParser(file)
     if type == "sample":
         logger.info("Load Sample Data")
-        load_sample_cells(data, dashboard_id, host=host, port=port)
         load_sample_statistics(data, dashboard_id, host=host, port=port)
 
-    load_dashboard_redim(data, type, dashboard_id, host=host, port=port)
-    load_dashboard_genes(data, dashboard_id, host=host, port=port)
+    load_dashboard_cells(data, type, dashboard_id, host=host, port=port)
+    # load_dashboard_redim(data, type, dashboard_id, host=host, port=port)
+    load_dashboard_genes(data, type, dashboard_id, host=host, port=port)
     load_dashboard_entry(type, dashboard_id, host=host, port=port)
     # Need rho loader (this only has to be done once)
 
@@ -64,21 +66,38 @@ def get_stats_records_generator(stats, sample_id):
         yield record
 
 
-def load_sample_cells(data, sample_id, host="localhost", port=9200):
-    logger.info("LOADING SAMPLE CELLS: " + sample_id)
-    cells = data.get_cells()
-    celltypes = data.get_celltypes()
+def load_dashboard_cells(data, type, dashboard_id, host="localhost", port=9200):
+    logger.info("LOADING DASHBOARD CELLS: " + dashboard_id)
 
+    redim = data.get_dim_red(
+        'scanorama_UMAP') if type == "patient" else data.get_dim_red()
+
+    cells = list(redim.keys())
+
+    celltypes = data.get_celltypes()
     rho_celltypes = get_rho_celltypes()
     celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
 
-    cell_records = get_sample_cells_generator(
-        cells, celltypes, rho_celltypes, celltype_probabilities, sample_id)
+    cell_records = get_cells_generator(
+        cells, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id)
     logger.info(" BEGINNING LOAD")
-    load_records(SAMPLE_CELLS_INDEX, cell_records, host=host, port=port)
+    load_records(DASHBOARD_CELLS_INDEX, cell_records, host=host, port=port)
+
+# def load_sample_cells(data, sample_id, host="localhost", port=9200):
+#     logger.info("LOADING SAMPLE CELLS: " + sample_id)
+#     cells = data.get_cells()
+#     celltypes = data.get_celltypes()
+
+#     rho_celltypes = get_rho_celltypes()
+#     celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
+
+#     cell_records = get_sample_cells_generator(
+#         cells, celltypes, rho_celltypes, celltype_probabilities, sample_id)
+#     logger.info(" BEGINNING LOAD")
+#     load_records(SAMPLE_CELLS_INDEX, cell_records, host=host, port=port)
 
 
-def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabilities, sample_id):
+def get_cells_generator(cells, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id):
 
     def get_cell_probabilities(cell):
         cell_probabilities = {}
@@ -91,40 +110,68 @@ def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabi
     for cell in cells:
         cell_probabilities = get_cell_probabilities(cell)
         record = {
-            "sample_id": sample_id,
+            "dashboard_id": dashboard_id,
             "cell_id": cell,
             "cell_type": celltypes[cell],
+            "x": redim[cell][0],
+            "y": redim[cell][1],
             **cell_probabilities
         }
         yield record
 
 
-def load_dashboard_redim(data, type, dashboard_id, host="localhost", port=9200):
-    logger.info("LOADING DASHBOARD RE-DIM: " + dashboard_id)
-    cells = data.get_cells()
+# def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabilities, sample_id):
+
+#     def get_cell_probabilities(cell):
+#         cell_probabilities = {}
+#         for celltype in rho_celltypes:
+#             cell_probabilities[celltype +
+#                                " probability"] = celltype_probabilities[celltype][cell]
+
+#         return cell_probabilities
+
+#     for cell in cells:
+#         cell_probabilities = get_cell_probabilities(cell)
+#         record = {
+#             "sample_id": sample_id,
+#             "cell_id": cell,
+#             "cell_type": celltypes[cell],
+#             **cell_probabilities
+#         }
+#         yield record
+
+
+# def load_dashboard_redim(data, type, dashboard_id, host="localhost", port=9200):
+#     logger.info("LOADING DASHBOARD RE-DIM: " + dashboard_id)
+#     cells = data.get_cells()
+#     redim = data.get_dim_red(
+#         'scanorama_UMAP') if type == "patient" else data.get_dim_red()
+
+#     redim_records = get_redim_record_generator(cells, redim, dashboard_id)
+#     logger.info(" BEGINNING LOAD")
+#     load_records(DASHBOARD_REDIM_INDEX + dashboard_id.lower(),
+#                  redim_records, host=host, port=port)
+
+
+# def get_redim_record_generator(cells, redim, dashboard_id):
+#     for cell in cells:
+#         record = {
+#             "cell_id": cell,
+#             "x": redim[cell][0],
+#             "y": redim[cell][1],
+#             "dashboard_id": dashboard_id
+#         }
+#         yield record
+
+
+def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
+    logger.info("LOADING DASHBOARD GENES: " + dashboard_id)
+
     redim = data.get_dim_red(
         'scanorama_UMAP') if type == "patient" else data.get_dim_red()
 
-    redim_records = get_redim_record_generator(cells, redim, dashboard_id)
-    logger.info(" BEGINNING LOAD")
-    load_records(DASHBOARD_REDIM_INDEX + dashboard_id.lower(),
-                 redim_records, host=host, port=port)
+    cells = list(redim.keys())
 
-
-def get_redim_record_generator(cells, redim, dashboard_id):
-    for cell in cells:
-        record = {
-            "cell_id": cell,
-            "x": redim[cell][0],
-            "y": redim[cell][1],
-            "dashboard_id": dashboard_id
-        }
-        yield record
-
-
-def load_dashboard_genes(data, dashboard_id, host="localhost", port=9200):
-    logger.info("LOADING DASHBOARD GENES: " + dashboard_id)
-    cells = data.get_cells()
     genes = data.get_gene_matrix()
 
     gene_records = get_gene_record_generator(cells, genes, dashboard_id)

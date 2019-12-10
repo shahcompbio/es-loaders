@@ -33,6 +33,7 @@ class scRNAParser():
             neighbors = point_tree.query_ball_point(point, neighbor_dist)
             if len(neighbors) > min_neighbors:
                 filtered_embedding[barcode] = point
+
         return dict(filtered_embedding)
 
     @staticmethod
@@ -124,6 +125,12 @@ class scRNAParser():
         coldata = self.data.colData
         assert pathway in coldata, "DNA repair type not computed."
         return dict(zip(coldata["Barcode"], coldata[pathway]))
+
+    def get_exhausted_probability(self):
+        # Needs to grab from a different rData file, but this is the gist of the code
+        coldata = self.data.colData
+        assert 'Exhausted_prob' in coldata, "Exhausted probability not computed."
+        return dict(zip(coldata["Barcode"], coldata['Exhausted_prob']))
 
 
 if __name__ == '__main__':
