@@ -3,7 +3,7 @@ import sys
 import click
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('mira_loading')
 
 SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
@@ -11,6 +11,7 @@ SAMPLE_CELLS_INDEX = "sample_cells"
 DASHBOARD_REDIM_INDEX = "dashboard_redim_"
 DASHBOARD_GENES_INDEX = "dashboard_genes_"
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
+DASHBOARD_CELLS_INDEX = "dashboard_cells"
 
 
 def clean_analysis(dashboard_id, type, host, port):
@@ -18,21 +19,13 @@ def clean_analysis(dashboard_id, type, host, port):
     logger.info("Cleaning records")
 
     if type == "sample":
-        logger.info("DELETE SAMPLE METADATA")
-        delete_records(SAMPLE_METADATA_INDEX, "sample_id",
-                       dashboard_id, host=host, port=port)
-
-        logger.info("DELETE SAMPLE CELLS")
-        delete_records(SAMPLE_CELLS_INDEX, "sample_id",
-                       dashboard_id, host=host, port=port)
-
         logger.info("DELETE SAMPLE STATS")
         delete_records(SAMPLE_STATS_INDEX, "sample_id",
                        dashboard_id, host=host, port=port)
 
-    logger.info("DELETE DASHBOARD REDIM")
-    delete_index(DASHBOARD_REDIM_INDEX +
-                 dashboard_id.lower(), host=host, port=port)
+    logger.info("DELETE DASHBOARD CELLS")
+    delete_records(DASHBOARD_CELLS_INDEX, "dashboard_id",
+                   dashboard_id, host=host, port=port)
 
     logger.info("DELETE DASHBOARD GENES")
     delete_index(DASHBOARD_GENES_INDEX +
