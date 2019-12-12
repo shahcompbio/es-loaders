@@ -7,6 +7,10 @@ from mira_loader import load_analysis as _load_analysis
 from mira_cleaner import clean_analysis as _clean_analysis
 from mira_data_checker import convert_metadata, check_analyses
 from mira_utils import get_new_ids
+from rho_loader import load_rho as _load_rho
+
+
+from elasticsearch import Elasticsearch
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
 
@@ -52,6 +56,61 @@ def load_analysis(ctx, filepath, dashboard_id, type):
 
 
 @main.command()
+@click.argument('filepath')
+@click.argument('dashboard_id')
+@click.argument('type')
+@click.pass_context
+def reload_analysis(ctx, filepath, dashboard_id, type):
+    _clean_analysis(dashboard_id, type,
+                    host=ctx.obj['host'], port=ctx.obj['port'])
+    try:
+        _load_analysis(filepath, dashboard_id, type,
+                       host=ctx.obj['host'], port=ctx.obj['port'])
+    except:
+        logger = ctx.obj['logger']
+        logger.exception('Error while loading analysis: ' + dashboard_id)
+        _clean_analysis(dashboard_id, type,
+                        host=ctx.obj['host'], port=ctx.obj['port'])
+
+
+@main.command()
+@click.argument('filepath')
+@click.pass_context
+def reload_all_analysis(ctx, filepath):
+    es = Elasticsearch(
+        hosts=[{'host': ctx.obj['host'], 'port':ctx.obj['port']}])
+    QUERY = {
+        "size": 10000
+    }
+    result = es.search(index="dashboard_entry", body=QUERY)
+
+    all_entries = [record["_source"]
+                   for record in result["hits"]["hits"]]
+
+    for record in all_entries:
+        _clean_analysis(record["dashboard_id"], record["type"],
+                        host=ctx.obj['host'], port=ctx.obj['port'])
+
+        try:
+            _load_analysis(filepath, record["dashboard_id"], record["type"],
+                           host=ctx.obj['host'], port=ctx.obj['port'])
+
+        except KeyboardInterrupt as err:
+            logger = ctx.obj['logger']
+            logger.exception()
+            _clean_analysis(dashboard_id, type,
+                            host=ctx.obj['host'], port=ctx.obj['port'])
+            break
+
+        except:
+            logger = ctx.obj['logger']
+            logger.exception('Error while loading analysis: ' + dashboard_id)
+            _clean_analysis(dashboard_id, type,
+                            host=ctx.obj['host'], port=ctx.obj['port'])
+            continue
+
+
+@main.command()
 @click.argument('dir')
 @click.argument('type')
 @click.pass_context
@@ -77,6 +136,14 @@ def load_new_ids_by_type(ctx, dir, type):
             _clean_analysis(dashboard_id, type,
                             host=ctx.obj['host'], port=ctx.obj['port'])
             continue
+
+
+@main.command()
+@click.pass_context
+def load_rho(ctx):
+    host = ctx.obj['host']
+    port = ctx.obj['port']
+    _load_rho(host, port)
 
 
 @main.command()

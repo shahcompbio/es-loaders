@@ -3,10 +3,8 @@ import os
 from common.genemarkermatrix import GeneMarkerMatrix
 from utils.elasticsearch import load_records
 
-import click
-
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("mira_loading")
 
 
 def get_rho(filename=None):
@@ -28,11 +26,7 @@ def get_rho_all_markers():
     return dict(rho.marker_list)
 
 
-@click.command()
-@click.option('--filename', default=None, help='Path to marker yaml')
-@click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
-@click.option('--port', default=9200, help='Port for Elasticsearch server')
-def load_rho(filename, host, port):
+def load_rho(host, port):
     logger.info("======================= LOADING RHO")
     rho = get_rho_all_markers()
 

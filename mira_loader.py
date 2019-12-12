@@ -74,12 +74,13 @@ def load_dashboard_cells(data, type, dashboard_id, host="localhost", port=9200):
 
     cells = list(redim.keys())
 
+    samples = data.get_cells()
     celltypes = data.get_celltypes()
     rho_celltypes = get_rho_celltypes()
     celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
 
     cell_records = get_cells_generator(
-        cells, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id)
+        cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id)
     logger.info(" BEGINNING LOAD")
     load_records(DASHBOARD_CELLS_INDEX, cell_records, host=host, port=port)
 
@@ -97,7 +98,7 @@ def load_dashboard_cells(data, type, dashboard_id, host="localhost", port=9200):
 #     load_records(SAMPLE_CELLS_INDEX, cell_records, host=host, port=port)
 
 
-def get_cells_generator(cells, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id):
+def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id):
 
     def get_cell_probabilities(cell):
         cell_probabilities = {}
@@ -115,7 +116,8 @@ def get_cells_generator(cells, celltypes, rho_celltypes, celltype_probabilities,
             "cell_type": celltypes[cell],
             "x": redim[cell][0],
             "y": redim[cell][1],
-            **cell_probabilities
+            "sample_id": samples[cell],
+            ** cell_probabilities
         }
         yield record
 
