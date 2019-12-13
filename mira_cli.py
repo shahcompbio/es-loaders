@@ -98,14 +98,15 @@ def reload_all_analysis(ctx, filepath):
         except KeyboardInterrupt as err:
             logger = ctx.obj['logger']
             logger.exception()
-            _clean_analysis(dashboard_id, type,
+            _clean_analysis(record["dashboard_id"], record["type"],
                             host=ctx.obj['host'], port=ctx.obj['port'])
             break
 
         except:
             logger = ctx.obj['logger']
-            logger.exception('Error while loading analysis: ' + dashboard_id)
-            _clean_analysis(dashboard_id, type,
+            logger.exception(
+                'Error while loading analysis: ' + record["dashboard_id"])
+            _clean_analysis(record["dashboard_id"], record["type"],
                             host=ctx.obj['host'], port=ctx.obj['port'])
             continue
 
