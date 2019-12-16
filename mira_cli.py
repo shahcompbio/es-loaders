@@ -18,7 +18,7 @@ LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
 @click.group()
 @click.option('--host', default='localhost', help='Hostname for Elasticsearch server')
 @click.option('--port', default=9200, help='Port for Elasticsearch server')
-@click.option('--debug/--no-debug', default=False, help='Turn on debugging logs')
+@click.option('--debug', is_flag=True, help='Turn on debugging logs')
 @click.pass_context
 def main(ctx, host, port, debug):
     ctx.obj['host'] = host
@@ -44,8 +44,15 @@ def main(ctx, host, port, debug):
 @click.argument('dashboard_id')
 @click.argument('type')
 @click.pass_context
-def load_analysis(ctx, filepath, dashboard_id, type):
+@click.option('--reload', is_flag=True, help="Force reload this library")
+def load_analysis(ctx, filepath, dashboard_id, type, reload):
+    if reload:
+        _clean_analysis(dashboard_id, type,
+                        host=ctx.obj['host'], port=ctx.obj['port'])
     try:
+        assert _is_not_loaded(
+            dashboard_id, type, ctx.obj['host'], ctx.obj['port']), dashboard_id + " has already been loaded"
+
         _load_analysis(filepath, dashboard_id, type,
                        host=ctx.obj['host'], port=ctx.obj['port'])
     except:
@@ -55,22 +62,34 @@ def load_analysis(ctx, filepath, dashboard_id, type):
                         host=ctx.obj['host'], port=ctx.obj['port'])
 
 
-@main.command()
-@click.argument('filepath')
-@click.argument('dashboard_id')
-@click.argument('type')
-@click.pass_context
-def reload_analysis(ctx, filepath, dashboard_id, type):
-    _clean_analysis(dashboard_id, type,
-                    host=ctx.obj['host'], port=ctx.obj['port'])
-    try:
-        _load_analysis(filepath, dashboard_id, type,
-                       host=ctx.obj['host'], port=ctx.obj['port'])
-    except:
-        logger = ctx.obj['logger']
-        logger.exception('Error while loading analysis: ' + dashboard_id)
-        _clean_analysis(dashboard_id, type,
-                        host=ctx.obj['host'], port=ctx.obj['port'])
+def _is_not_loaded(dashboard_id, type, host, port):
+    es = Elasticsearch(
+        hosts=[{'host': host, 'port': port}])
+    QUERY = {
+        "query": {
+            "bool": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "dashboard_id": dashboard_id
+                                }
+                            },
+                            {
+                                "term": {
+                                    "term": term
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    result = es.search(index="dashboard_entry", body=QUERY)
+
+    return result["hits"]["total"]["value"] == 0
 
 
 @main.command()
@@ -87,28 +106,51 @@ def reload_all_analysis(ctx, filepath):
     all_entries = [record["_source"]
                    for record in result["hits"]["hits"]]
 
+    NEW_QUERY = {
+        "size": 0,
+        "aggs": {
+            "agg_terms_dashboard_id": {
+                "terms": {
+                    "field": "dashboard_id",
+                    "size": 1000,
+                    "order": {
+                        "_key": "asc"
+                    }
+                }
+            }
+        }
+    }
+
+    new_result = es.search(index="dashboard_cells", body=NEW_QUERY)
+
+    new_entries = [record["key"] for record in new_result["aggregations"]
+                   ["agg_terms_dashboard_id"]["buckets"]]
+
+    logger = ctx.obj['logger']
     for record in all_entries:
-        _clean_analysis(record["dashboard_id"], record["type"],
-                        host=ctx.obj['host'], port=ctx.obj['port'])
-
-        try:
-            _load_analysis(filepath, record["dashboard_id"], record["type"],
-                           host=ctx.obj['host'], port=ctx.obj['port'])
-
-        except KeyboardInterrupt as err:
-            logger = ctx.obj['logger']
-            logger.exception()
-            _clean_analysis(record["dashboard_id"], record["type"],
+        dashboard_id = record["dashboard_id"]
+        logger.info(dashboard_id)
+        if dashboard_id in new_entries:
+            logger.info("=== RELOADING: " + dashboard_id)
+            _clean_analysis(dashboard_id, record["type"],
                             host=ctx.obj['host'], port=ctx.obj['port'])
-            break
 
-        except:
-            logger = ctx.obj['logger']
-            logger.exception(
-                'Error while loading analysis: ' + record["dashboard_id"])
-            _clean_analysis(record["dashboard_id"], record["type"],
-                            host=ctx.obj['host'], port=ctx.obj['port'])
-            continue
+            try:
+                _load_analysis(filepath, dashboard_id, record["type"],
+                               host=ctx.obj['host'], port=ctx.obj['port'])
+
+            except KeyboardInterrupt as err:
+                logger.exception()
+                _clean_analysis(dashboard_id, record["type"],
+                                host=ctx.obj['host'], port=ctx.obj['port'])
+                break
+
+            except:
+                logger.exception(
+                    'Error while loading analysis: ' + dashboard_id)
+                _clean_analysis(dashboard_id, record["type"],
+                                host=ctx.obj['host'], port=ctx.obj['port'])
+                continue
 
 
 @main.command()
