@@ -8,7 +8,7 @@ logger = logging.getLogger('mira_loading')
 
 
 def load_record(index, record, host="localhost", port=9200):
-    es = ElasticsearchClient(host=host, port=port)
+    es = ElasticsearchClient(host=host, port=port, retry_on_timeout=True)
     if not es.is_index_exists(index):
         es.create_index(index)
 
