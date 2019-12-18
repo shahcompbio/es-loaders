@@ -4,7 +4,7 @@ import logging.handlers
 import os
 
 from mira_loader import load_analysis as _load_analysis
-from mira_cleaner import clean_analysis as _clean_analysis
+from mira_cleaner import clean_analysis as _clean_analysis, delete_index
 from mira_data_checker import convert_metadata, check_analyses
 from mira_utils import get_new_ids
 from rho_loader import load_rho as _load_rho
@@ -78,7 +78,7 @@ def _is_not_loaded(dashboard_id, type, host, port):
                             },
                             {
                                 "term": {
-                                    "term": term
+                                    "type": type
                                 }
                             }
                         ]
@@ -132,6 +132,7 @@ def reload_all_analysis(ctx, filepath):
         logger.info(dashboard_id)
         if dashboard_id in new_entries:
             logger.info("=== RELOADING: " + dashboard_id)
+
             _clean_analysis(dashboard_id, record["type"],
                             host=ctx.obj['host'], port=ctx.obj['port'])
 
