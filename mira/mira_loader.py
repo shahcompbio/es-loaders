@@ -1,14 +1,15 @@
+
+import click
 import sys
 import math
 import yaml
 import logging
+from mira.metadata_parser import MiraMetadata
+from mira.rho_loader import get_rho_celltypes
+from mira.mira_cleaner import clean_analysis
 from common.scrna_parser import scRNAParser
 from utils.elasticsearch import load_records, load_record
-from mira.mira_metadata_parser import single_sample, patient_samples
-from rho_loader import get_rho_celltypes
-from mira_cleaner import clean_analysis
 
-import click
 
 # SAMPLE_METADATA_INDEX = "sample_metadata"
 SAMPLE_STATS_INDEX = "sample_stats"
@@ -21,7 +22,8 @@ DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 logger = logging.getLogger('mira_loading')
 
 
-def load_analysis(filepath, dashboard_id, type, host, port):
+def load_analysis(filepath, dashboard_id, type, host, port, metadata=None):
+
     logger.info("====================== " + dashboard_id)
     file = _get_filepath(filepath, dashboard_id, type)
     logger.info("Opening File: " + file)
@@ -31,10 +33,9 @@ def load_analysis(filepath, dashboard_id, type, host, port):
         load_sample_statistics(data, dashboard_id, host=host, port=port)
 
     load_dashboard_cells(data, type, dashboard_id, host=host, port=port)
-    # load_dashboard_redim(data, type, dashboard_id, host=host, port=port)
     load_dashboard_genes(data, type, dashboard_id, host=host, port=port)
-    load_dashboard_entry(type, dashboard_id, host=host, port=port)
-    # Need rho loader (this only has to be done once)
+    load_dashboard_entry(type, dashboard_id,
+                         metadata=metadata, host=host, port=port)
 
 
 def _get_filepath(filepath, dashboard_id, type):
@@ -84,19 +85,6 @@ def load_dashboard_cells(data, type, dashboard_id, host="localhost", port=9200):
     logger.info(" BEGINNING LOAD")
     load_records(DASHBOARD_CELLS_INDEX, cell_records, host=host, port=port)
 
-# def load_sample_cells(data, sample_id, host="localhost", port=9200):
-#     logger.info("LOADING SAMPLE CELLS: " + sample_id)
-#     cells = data.get_cells()
-#     celltypes = data.get_celltypes()
-
-#     rho_celltypes = get_rho_celltypes()
-#     celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
-
-#     cell_records = get_sample_cells_generator(
-#         cells, celltypes, rho_celltypes, celltype_probabilities, sample_id)
-#     logger.info(" BEGINNING LOAD")
-#     load_records(SAMPLE_CELLS_INDEX, cell_records, host=host, port=port)
-
 
 def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id):
 
@@ -120,50 +108,6 @@ def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_proba
             ** cell_probabilities
         }
         yield record
-
-
-# def get_sample_cells_generator(cells, celltypes, rho_celltypes, celltype_probabilities, sample_id):
-
-#     def get_cell_probabilities(cell):
-#         cell_probabilities = {}
-#         for celltype in rho_celltypes:
-#             cell_probabilities[celltype +
-#                                " probability"] = celltype_probabilities[celltype][cell]
-
-#         return cell_probabilities
-
-#     for cell in cells:
-#         cell_probabilities = get_cell_probabilities(cell)
-#         record = {
-#             "sample_id": sample_id,
-#             "cell_id": cell,
-#             "cell_type": celltypes[cell],
-#             **cell_probabilities
-#         }
-#         yield record
-
-
-# def load_dashboard_redim(data, type, dashboard_id, host="localhost", port=9200):
-#     logger.info("LOADING DASHBOARD RE-DIM: " + dashboard_id)
-#     cells = data.get_cells()
-#     redim = data.get_dim_red(
-#         'scanorama_UMAP') if type == "patient" else data.get_dim_red()
-
-#     redim_records = get_redim_record_generator(cells, redim, dashboard_id)
-#     logger.info(" BEGINNING LOAD")
-#     load_records(DASHBOARD_REDIM_INDEX + dashboard_id.lower(),
-#                  redim_records, host=host, port=port)
-
-
-# def get_redim_record_generator(cells, redim, dashboard_id):
-#     for cell in cells:
-#         record = {
-#             "cell_id": cell,
-#             "x": redim[cell][0],
-#             "y": redim[cell][1],
-#             "dashboard_id": dashboard_id
-#         }
-#         yield record
 
 
 def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
@@ -196,37 +140,36 @@ def get_gene_record_generator(cells, gene_matrix, dashboard_id):
             yield record
 
 
-def load_dashboard_entry(type, dashboard_id, sheet=None, host="localhost", port=9200):
+def load_dashboard_entry(type, dashboard_id, metadata=None, host="localhost", port=9200):
+
+    if metadata is None:
+        metadata = MiraMetadata()
+
     logger.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
 
-    metadata = _get_metadata(type, dashboard_id, sheet)
+    metadata_records = _get_metadata(type, dashboard_id, metadata)
 
     record = {
         "dashboard_id": dashboard_id,
         "type": type,
-        "patient_id": metadata[0]["patient_id"],
-        "sort": _format_sort(metadata[0]["sort_parameters"]),
-        "sample_ids": [datum["nick_unique_id"] for datum in metadata],
-        "surgery": list(set([datum["time"] for datum in metadata])),
-        "treatment": list(set([datum["therapy"] for datum in metadata])),
-        "site": list(set([datum["tumour_site"] for datum in metadata]))
+        "patient_id": metadata_records[0]["patient_id"],
+        "sort": metadata_records[0]["sort_parameters"],
+        "sample_ids": [datum["nick_unique_id"] for datum in metadata_records],
+        "surgery": list(set([datum["time"] for datum in metadata_records])),
+        "treatment": list(set([datum["therapy"] for datum in metadata_records])),
+        "site": list(set([datum["tumour_site"] for datum in metadata_records]))
     }
     logger.info(" BEGINNING LOAD")
     logger.info(record)
     load_record(DASHBOARD_ENTRY_INDEX, record, host=host, port=port)
 
 
-def _get_metadata(type, dashboard_id, sheet):
+def _get_metadata(type, dashboard_id, metadata):
     if type == "sample":
-        return [single_sample(dashboard_id, sheet=sheet)]
+        return metadata.get_data([dashboard_id])
     else:  # assume patient
-        [patient_id, sort] = dashboard_id.split("_")
-        samples = patient_samples(patient_id, sheet=sheet)
-        return [sample for sample in samples if _format_sort(sample["sort_parameters"]) == sort]
-
-
-def _format_sort(sort):
-    return {'singlet, live, CD45+': 'CD45P', 'singlet, live, CD45-': 'CD45N', 'singlet, live, U': 'U'}[sort]
+        sample_ids = metadata.support_sample_ids(dashboard_id)
+        return metadata.get_data(sample_ids)
 
 
 if __name__ == '__main__':

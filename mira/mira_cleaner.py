@@ -1,6 +1,5 @@
 from elasticsearch import Elasticsearch
 import sys
-import click
 
 import logging
 logger = logging.getLogger('mira_loading')
