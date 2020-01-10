@@ -8,6 +8,7 @@ from mira.mira_cleaner import clean_analysis as _clean_analysis, delete_index
 from mira.mira_utils import get_new_ids
 from mira.rho_loader import load_rho as _load_rho
 from mira.metadata_parser import MiraMetadata
+from mira.verify import verify_indices
 
 
 from elasticsearch import Elasticsearch
@@ -108,6 +109,8 @@ def update_to_v2(ctx, filepath):
     load_analysis_list(filepath, to_load, ctx.obj['logger'], ctx.obj['host'],
                        ctx.obj['port'], reload=True)
 
+    verify_indices(host=ctx.obj['host'], port=ctx.obj['port'])
+
 
 def load_analysis_list(filepath, to_load, logger, host, port, reload=False, metadata=None):
 
@@ -121,16 +124,14 @@ def load_analysis_list(filepath, to_load, logger, host, port, reload=False, meta
             _clean_analysis(load_id, load_type,
                             host=host, port=port)
         try:
-            assert _is_not_loaded(
-                load_id, load_type, host=host, port=port), load_id + " has already been loaded"
+            if is_loaded(
+                    load_id, load_type, host=host, port=port):
+                logger.warning(
+                    "===== DASHBOARD has been loaded before - will skip: " + load_id)
 
-            _load_analysis(filepath, load_id, load_type, metadata=metadata,
-                           host=host, port=port)
-        except AssertionError:
-            logger.exception("Assert failed: " + load_id +
-                             " has already been loaded")
-
-            continue
+            else:
+                _load_analysis(filepath, load_id, load_type, metadata=metadata,
+                               host=host, port=port)
 
         except KeyboardInterrupt:
             logger.exception()
@@ -145,7 +146,7 @@ def load_analysis_list(filepath, to_load, logger, host, port, reload=False, meta
             continue
 
 
-def _is_not_loaded(dashboard_id, type, host, port):
+def is_loaded(dashboard_id, type, host, port):
     es = Elasticsearch(
         hosts=[{'host': host, 'port': port}])
     QUERY = {
@@ -172,7 +173,7 @@ def _is_not_loaded(dashboard_id, type, host, port):
     }
     result = es.search(index="dashboard_entry", body=QUERY)
 
-    return result["hits"]["total"]["value"] == 0
+    return result["hits"]["total"]["value"] > 0
 
 
 @main.command()
@@ -181,6 +182,14 @@ def load_rho(ctx):
     host = ctx.obj['host']
     port = ctx.obj['port']
     _load_rho(host, port)
+
+
+@main.command()
+@click.pass_context
+def verify_load(ctx):
+    host = ctx.obj['host']
+    port = ctx.obj['port']
+    verify_indices(host=host, port=port)
 
 
 @main.command()
