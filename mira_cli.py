@@ -106,7 +106,7 @@ def update_to_v2(ctx, filepath):
     }
     result = es.search(index="dashboard_entry", body=QUERY)
 
-    to_load = [record["_source"]
+    to_load = [[record["_source"]["dashboard_id"], record["_source"]["type"]]
                for record in result["hits"]["hits"] if record["_source"]["dashboard_id"] not in new_entries]
     load_analysis_list(filepath, to_load, ctx.obj['logger'], ctx.obj['host'],
                        ctx.obj['port'], reload=True)
