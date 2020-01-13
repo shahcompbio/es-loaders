@@ -42,8 +42,10 @@ def delete_index(index, host="localhost", port=9200):
 
 def delete_records(index, filter_key, filter_value, host="localhost", port=9200):
     es = Elasticsearch(hosts=[{'host': host, 'port': port}])
-    query = fill_base_query(filter_key, filter_value)
-    es.delete_by_query(index=index, body=query)
+
+    if es.indices.exists(index):
+        query = fill_base_query(filter_key, filter_value)
+        es.delete_by_query(index=index, body=query)
 
 
 def fill_base_query(key, value):
