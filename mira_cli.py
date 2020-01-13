@@ -79,25 +79,27 @@ def update_to_v2(ctx, filepath):
     es = Elasticsearch(
         hosts=[{'host': ctx.obj['host'], 'port':ctx.obj['port']}])
 
-    NEW_QUERY = {
-        "size": 0,
-        "aggs": {
-            "agg_terms_dashboard_id": {
-                "terms": {
-                    "field": "dashboard_id",
-                    "size": 1000,
-                    "order": {
-                        "_key": "asc"
+    new_entries = []
+    if es.indices.exists("dashboard_cells"):
+        NEW_QUERY = {
+            "size": 0,
+            "aggs": {
+                "agg_terms_dashboard_id": {
+                    "terms": {
+                        "field": "dashboard_id",
+                        "size": 1000,
+                        "order": {
+                            "_key": "asc"
+                        }
                     }
                 }
             }
         }
-    }
 
-    new_result = es.search(index="dashboard_cells", body=NEW_QUERY)
+        new_result = es.search(index="dashboard_cells", body=NEW_QUERY)
 
-    new_entries = [record["key"] for record in new_result["aggregations"]
-                   ["agg_terms_dashboard_id"]["buckets"]]
+        new_entries = [record["key"] for record in new_result["aggregations"]
+                       ["agg_terms_dashboard_id"]["buckets"]]
 
     QUERY = {
         "size": 10000
