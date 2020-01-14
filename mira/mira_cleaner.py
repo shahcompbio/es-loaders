@@ -45,7 +45,7 @@ def delete_records(index, filter_key, filter_value, host="localhost", port=9200)
 
     if es.indices.exists(index):
         query = fill_base_query(filter_key, filter_value)
-        es.delete_by_query(index=index, body=query)
+        es.delete_by_query(index=index, body=query, refresh=True)
 
 
 def fill_base_query(key, value):
