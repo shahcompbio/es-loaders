@@ -8,7 +8,7 @@ from mira.mira_cleaner import clean_analysis as _clean_analysis, delete_index
 from mira.mira_utils import get_new_ids
 from mira.rho_loader import load_rho as _load_rho
 from mira.metadata_parser import MiraMetadata
-from mira.verify import verify_indices
+from mira.verify import verify_indices, missing_dashboards as _missing_dashboards
 
 
 from elasticsearch import Elasticsearch
@@ -101,6 +101,8 @@ def update_to_v2(ctx, filepath):
         new_entries = [record["key"] for record in new_result["aggregations"]
                        ["agg_terms_dashboard_id"]["buckets"]]
 
+        print(new_entries)
+
     QUERY = {
         "size": 10000
     }
@@ -108,8 +110,9 @@ def update_to_v2(ctx, filepath):
 
     to_load = [[record["_source"]["dashboard_id"], record["_source"]["type"]]
                for record in result["hits"]["hits"] if record["_source"]["dashboard_id"] not in new_entries]
-    load_analysis_list(filepath, to_load, ctx.obj['logger'], ctx.obj['host'],
-                       ctx.obj['port'], reload=True)
+    print(to_load)
+    # load_analysis_list(filepath, to_load, ctx.obj['logger'], ctx.obj['host'],
+    #                    ctx.obj['port'], reload=True)
 
     verify_indices(host=ctx.obj['host'], port=ctx.obj['port'])
 
@@ -192,6 +195,14 @@ def verify_load(ctx):
     host = ctx.obj['host']
     port = ctx.obj['port']
     verify_indices(host=host, port=port)
+
+
+@main.command()
+@click.pass_context
+def missing_dashboards(ctx):
+    host = ctx.obj['host']
+    port = ctx.obj['port']
+    _missing_dashboards(host=host, port=port)
 
 
 @main.command()

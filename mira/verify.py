@@ -42,6 +42,34 @@ def verify_indices(host='localhost', port=9200):
                 logger.info(sample_id)
 
 
+def missing_dashboards(host='localhost', port=9200):
+
+    es = Elasticsearch(
+        hosts=[{'host': host, 'port': port}])
+    loaded_dashboards = [record["dashboard_id"]
+                         for record in get_loaded_dashboards(es)]
+
+    metadata = MiraMetadata()
+    sample_ids = metadata.sample_ids()
+
+    missing_sample_ids = [
+        sample_id for sample_id in sample_ids if not sample_id in loaded_dashboards]
+
+    logger.info("====== MISSING SAMPLE DASHBOARDS: " +
+                str(len(missing_sample_ids)))
+    for missing_sample_id in missing_sample_ids:
+        logger.info(missing_sample_id)
+
+    patient_ids = metadata.patient_sort_ids()
+    missing_patient_ids = [
+        patient_id for patient_id in patient_ids if not patient_id in loaded_dashboards]
+
+    logger.info("====== MISSING PATIENT DASHBOARDS: " +
+                str(len(missing_patient_ids)))
+    for missing_patient_id in missing_patient_ids:
+        logger.info(missing_patient_id)
+
+
 def get_loaded_dashboards(es):
     QUERY = {
         "size": 10000
