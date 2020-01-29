@@ -1,0 +1,27 @@
+{
+	"bins": {
+		"_size": {"enabled": true},
+		"properties": {
+			"cell_id": {"index": "not_analyzed", "type": "string"},
+			"state": {"index": "not_analyzed", "type": "long"},
+			"start": {"index": "not_analyzed", "type": "long"},
+			"reads": {"index": "not_analyzed", "type": "long"},
+			"chrom_number": {"index": "not_analyzed", "type": "string"},
+			"gc": {"index": "not_analyzed", "type": "float"},
+			"caller": {"index": "not_analyzed", "type": "string"},
+			"sample_id": {"index": "not_analyzed", "type": "string"},
+			"end": {"index": "not_analyzed", "type": "long"},
+			"copy": {"index": "not_analyzed", "type": "float"}
+		},
+ 		"dynamic_templates": [{
+ 			"string_values": {
+ 				"match_mapping_type": "string", 
+ 				"mapping": {"index": "not_analyzed", "type": "string"},
+ 				"match": "*"
+ 			}
+ 		}]
+ 	}
+ }
+
+
+ 

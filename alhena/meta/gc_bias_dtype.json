@@ -1,0 +1,9 @@
+{
+    "caller": "str",
+    "median": "float",
+    "gc_percent": "int",
+    "high_ci": "float",
+    "experimental_condition": "str",
+    "low_ci": "float",
+    "sample_id": "str"
+}
