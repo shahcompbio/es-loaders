@@ -1,0 +1,43 @@
+{
+      "gc_bias" : {
+        "_size" : {
+          "enabled" : true
+        },
+        "dynamic_templates" : [ {
+          "string_values" : {
+            "mapping" : {
+              "index" : "not_analyzed",
+              "type" : "string"
+            },
+            "match" : "*",
+            "match_mapping_type" : "string"
+          }
+        } ],
+        "properties" : {
+          "caller" : {
+            "type" : "string",
+            "index" : "not_analyzed"
+          },
+          "experimental_condition" : {
+            "type" : "string",
+            "index" : "not_analyzed"
+          },
+          "gc_percent" : {
+            "type" : "long"
+          },
+          "high_ci" : {
+            "type" : "double"
+          },
+          "low_ci" : {
+            "type" : "double"
+          },
+          "median" : {
+            "type" : "float"
+          },
+          "sample_id" : {
+            "type" : "string",
+            "index" : "not_analyzed"
+          }
+        }
+      }
+}

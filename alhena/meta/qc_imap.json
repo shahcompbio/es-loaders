@@ -1,0 +1,59 @@
+
+{
+	"qc": {
+		"_size": {"enabled": true},
+		"properties": {
+			"estimated_library_size": {"index": "not_analyzed", "type": "string"},
+			"total_mapped_reads": {"index": "not_analyzed", "type": "long"},
+			"total_properly_paired": {"index": "not_analyzed", "type": "long"},
+			"MBRSM_dispersion": {"index": "not_analyzed", "type": "float"},
+			"mad_hmmcopy": {"index": "not_analyzed", "type": "float"},
+			"state_mode": {"index": "not_analyzed", "type": "long"},
+			"MSRSI_non_integerness": {"index": "not_analyzed", "type": "float"},
+			"sample_id": {"index": "not_analyzed", "type": "string"},
+			"total_duplicate_reads": {"index": "not_analyzed", "type": "long"},
+			"quality": {"index": "not_analyzed", "type": "float"},
+			"cv_hmmcopy": {"index": "not_analyzed", "type": "float"},
+			"empty_bins_hmmcopy": {"index": "not_analyzed", "type": "float"},
+			"row": {"index": "not_analyzed", "type": "long"},
+			"percent_duplicate_reads": {"index": "not_analyzed", "type": "float"},
+			"MBRSI_dispersion_non_integerness": {"index": "not_analyzed", "type": "float"},
+			"sample_type": {"index": "not_analyzed", "type": "string"},
+			"mean_insert_size": {"index": "not_analyzed", "type": "float"},
+			"coverage_breadth": {"index": "not_analyzed", "type": "float"},
+			"unpaired_duplicate_reads": {"index": "not_analyzed", "type": "long"},
+			"unpaired_mapped_reads": {"index": "not_analyzed", "type": "long"},
+			"unmapped_reads": {"index": "not_analyzed", "type": "long"},
+			"breakpoints": {"index": "not_analyzed", "type": "long"},
+			"cell_id": {"index": "not_analyzed", "type": "string"},
+			"cell_call": {"index": "not_analyzed", "type": "string"},
+			"coverage_depth": {"index": "not_analyzed", "type": "float"},
+			"median_insert_size": {"index": "not_analyzed", "type": "float"},
+			"mean_state_mads": {"index": "not_analyzed", "type": "float"},
+			"mean_copy": {"index": "not_analyzed", "type": "float"},
+			"mean_hmmcopy_reads_per_bin": {"index": "not_analyzed", "type": "float"},
+			"total_reads": {"index": "not_analyzed", "type": "long"},
+			"total_halfiness": {"index": "not_analyzed", "type": "float"},
+			"std_hmmcopy_reads_per_bin": {"index": "not_analyzed", "type": "float"},
+			"standard_deviation_insert_size": {"index": "not_analyzed", "type": "float"},
+			"mean_state_vars": {"index": "not_analyzed", "type": "float"},
+			"column": {"index": "not_analyzed", "type": "long"},
+			"paired_mapped_reads": {"index": "not_analyzed", "type": "long"},
+			"caller": {"index": "not_analyzed", "type": "string"},
+			"true_multiplier": {"index": "not_analyzed", "type": "float"},
+			"paired_duplicate_reads": {"index": "not_analyzed", "type": "long"},
+			"median_hmmcopy_reads_per_bin": {"index": "not_analyzed", "type": "float"},
+			"experimental_condition": {"index": "not_analyzed", "type": "string"},
+			"mad_neutral_state": {"index": "not_analyzed", "type": "float"},
+			"autocorrelation_hmmcopy": {"index": "not_analyzed", "type": "float"},
+			"scaled_halfiness": {"index": "not_analyzed", "type": "float"}
+ 		},
+ 	"dynamic_templates": [{
+ 		"string_values": {
+	 		"match_mapping_type": "string", 
+	 		"mapping": {"index": "not_analyzed", "type": "string"},
+	 		"match": "*"
+	 		}
+ 		}]
+	}
+}
