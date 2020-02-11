@@ -12,7 +12,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pprint
 
-API_KEY     = "c87679f3666520e8d401b1c7a033ce92"  # os.environ["ELAB_API_KEY"]
+API_KEY     = os.environ["ELAB_API_KEY"]
 SAMPLES_URL = "https://msk.elabinventory.com/api/v1/samples/"
 SAMPLE_URL  = "https://msk.elabinventory.com/api/v1/samples/{sampleid}/meta"
 
