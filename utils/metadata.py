@@ -136,5 +136,3 @@ def single_sample(nick_unique_id):
     return sample
 
 
-a = all_samples()
-print(a)
