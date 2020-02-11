@@ -11,6 +11,7 @@ import numpy as np
 from esclient import ElasticsearchClient
 from scgenome.loaders.qc import load_qc_data
 from scgenome.db.qc import cache_qc_results
+from analysis_loader import AnalysisLoader
 
 """
 Eli Havasov 1-27-2021
@@ -70,13 +71,13 @@ def clean_nans(record):
 
 
 def load_index(elasticsearch_client, index_name, data,):
-    data_header = json.dumps({ 'index': {'_index': index_name}})
+    data_header = json.dumps({'index': {'_index': index_name}})
 
     batch_size = int(1e4)
     for batch_start_idx in range(0, data.shape[0], batch_size):
         batch_end_idx = min(batch_start_idx + batch_size, data.shape[0])
         batch_data = data.loc[data.index[batch_start_idx:batch_end_idx]]
-             
+
         clean_fields(batch_data)
 
         data_str = ''
@@ -84,7 +85,7 @@ def load_index(elasticsearch_client, index_name, data,):
             clean_nans(record)
             data_str += data_header + '\n' + json.dumps(record) + '\n'
 
-        count_before = elasticsearch_client.count(index_name) 
+        count_before = elasticsearch_client.count(index_name)
         elasticsearch_client.load_bulk(index_name, data_str)
         count_after = elasticsearch_client.count(index_name)
         count_added = count_after - count_before
@@ -132,30 +133,30 @@ def get_bins_data(hmmcopy_data):
 
 def get_gc_bias_data(hmmcopy_data):
     data = hmmcopy_data['gc_metrics']
-    data = data.merge(hmmcopy_data['annotation_metrics'][[
-                      'cell_id', 'experimental_condition']], on='cell_id', how='left')
+    # data = data.merge(hmmcopy_data['annotation_metrics'][[
+    #                   'cell_id', 'experimental_condition']], on='cell_id', how='left')
 
-    # Create a stacked data frame with columns:
-    # experimental_condition, gc_percent, value
-    gc_percent_columns = [str(a) for a in range(101)]
-    data = data.set_index('experimental_condition')[gc_percent_columns]
-    data.columns.name = 'gc_percent'
-    data = data.stack().rename('value').reset_index()
+    # # Create a stacked data frame with columns:
+    # # experimental_condition, gc_percent, value
+    # gc_percent_columns = [str(a) for a in range(101)]
+    # data = data.set_index('experimental_condition')[gc_percent_columns]
+    # data.columns.name = 'gc_percent'
+    # data = data.stack().rename('value').reset_index()
 
-    # Calculate stats for groups by experimental condition
-    data = data.groupby(['experimental_condition', 'gc_percent'])['value'].agg([
-        'mean', 'median', 'std', 'size'])
+    # # Calculate stats for groups by experimental condition
+    # data = data.groupby(['experimental_condition', 'gc_percent'])['value'].agg([
+    #     'mean', 'median', 'std', 'size'])
 
-    # Add 95% confidence intervals
-    t_bounds = scipy.stats.t.interval(0.95, data['size'] - 1)
-    data['low_ci'] = data['mean'] + t_bounds[0] * \
-        data['std'] / np.sqrt(data['size'])
-    data['high_ci'] = data['mean'] + t_bounds[1] * \
-        data['std'] / np.sqrt(data['size'])
+    # # Add 95% confidence intervals
+    # t_bounds = scipy.stats.t.interval(0.95, data['size'] - 1)
+    # data['low_ci'] = data['mean'] + t_bounds[0] * \
+    #     data['std'] / np.sqrt(data['size'])
+    # data['high_ci'] = data['mean'] + t_bounds[1] * \
+    #     data['std'] / np.sqrt(data['size'])
 
-    columns = ['experimental_condition',
-               'gc_percent', 'high_ci', 'low_ci', 'median']
-    data = data.reset_index()[columns]
+    # columns = ['experimental_condition',
+    #            'gc_percent', 'high_ci', 'low_ci', 'median']
+    # data = data.reset_index()[columns]
 
     return data
 
@@ -172,20 +173,21 @@ def get_gc_bias_data(hmmcopy_data):
 @click.option('--cell_ids', '-c', multiple=True)
 @click.option('--experimental_condition_override')
 def load_ticket(
-        jira_ticket,
-        ip_address,
-        local_cache_directory=None,
-        ticket_directory=None,
-        description=None,
-        title=None,
-        sample_id=None,
-        cell_subset_count=None,
-        cell_ids=None,
-        experimental_condition_override=None,
-    ):
+    jira_ticket,
+    ip_address,
+    local_cache_directory=None,
+    ticket_directory=None,
+    description=None,
+    title=None,
+    sample_id=None,
+    cell_subset_count=None,
+    cell_ids=None,
+    experimental_condition_override=None,
+):
 
     if (local_cache_directory is not None) == (len(ticket_directory) > 0):
-        raise ValueError('must specify one of local_cache_directory or ticket_directory')
+        raise ValueError(
+            'must specify one of local_cache_directory or ticket_directory')
 
     if len(cell_ids) == 0:
         cell_ids = None
@@ -206,7 +208,8 @@ def load_ticket(
         for table_name, data in load_qc_data(d).items():
             hmmcopy_data[table_name].append(data)
     for table_name in hmmcopy_data:
-        hmmcopy_data[table_name] = pd.concat(hmmcopy_data[table_name], ignore_index=True)
+        hmmcopy_data[table_name] = pd.concat(
+            hmmcopy_data[table_name], ignore_index=True)
 
     if experimental_condition_override is not None:
         for table_name, data in hmmcopy_data.items():
@@ -232,12 +235,12 @@ def load_ticket(
         f"gc_bias": get_gc_bias_data,
     }
 
-    for index_type, get_data  in index_get_data.items():
+    for index_type, get_data in index_get_data.items():
         index_name = f"{jira_ticket.lower()}_{index_type}"
         logging.info(f"Index {index_name}")
 
         init_load(elasticsearch_client, index_name,)
-            
+
         data = get_data(hmmcopy_data)
 
         # Subset cells
@@ -251,8 +254,13 @@ def load_ticket(
 
         load_index(elasticsearch_client, index_name, data,)
 
-    logging.info(f"loading published dashboard record {jira_ticket} - {title} - {description}")
-    elasticsearch_client.load_published_dashboard_record(jira_ticket, title=title, description=description)
+    logging.info(
+        f"loading published dashboard record {jira_ticket}")
+
+    AnalysisLoader().load_data(jira_ticket, ip_address, 9200)
+
+# elasticsearch_client.load_published_dashboard_record(
+#     jira_ticket, title=title, description=description)
 
 
 def json_to_dict(path):
@@ -263,7 +271,7 @@ def json_to_dict(path):
 def run_test_load():
     elasticsearch_client = ElasticsearchClient(host='localhost')
     ticket = 'test'
-    
+
     for index_type in ('qc', 'segs', 'bins', 'gc_bias'):
 
         data = json_to_dict(f'./meta/{index_type}.json')
@@ -278,7 +286,8 @@ def run_test_load():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+    logging.basicConfig(format=LOGGING_FORMAT,
+                        stream=sys.stderr, level=logging.INFO)
 
     load_ticket()
     # run_test_load()
