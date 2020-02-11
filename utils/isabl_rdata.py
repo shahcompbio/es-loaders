@@ -101,17 +101,6 @@ def get_samples():
     return sample_look_up
 
 
-def get_scrna_rdata_by_individuals(individual_ids):
-    all_rdata = get_scrna_rdata()
-    filtered_rdata = {}
-
-    for individual in individual_ids:
-        filtered_rdata[individual] = all_rdata[individual]
-        logging.info(f"{individual} - {filtered_rdata[individual]}")
-
-    return filtered_rdata
-
-
 def get_scrna_rdata(individuals=None):
     latest_scrna_rdata = []
     filtered_analyses = filter_analyses(ii.get_instances('analyses'))
