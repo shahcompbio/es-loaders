@@ -12,19 +12,19 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pprint
 
-API_KEY     = os.environ["ELAB_API_KEY"]
+API_KEY = os.environ["ELAB_API_KEY"]
 SAMPLES_URL = "https://msk.elabinventory.com/api/v1/samples/"
-SAMPLE_URL  = "https://msk.elabinventory.com/api/v1/samples/{sampleid}/meta"
+SAMPLE_URL = "https://msk.elabinventory.com/api/v1/samples/{sampleid}/meta"
 
-SCOPES                = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 SAMPLE_SPREADSHEET_ID = '1plhIL1rH2IuQ8b_komjAUHKKrnYPNDyhvNNRsTv74u8'
-SAMPLE_RANGE_NAME     = 'sample_metadata!A1:L'
+SAMPLE_RANGE_NAME = 'sample_metadata!A1:L'
 
 pp = pprint.PrettyPrinter(indent=2)
 
 
 def resolve_igo(unique_id):
-    validate="/work/shah/data/scrnaseq/*/"
+    validate = "/work/shah/data/scrnaseq/*/"
     valid_directories = glob.glob(validate)
     for valid_directory in valid_directories:
         valid_sample = valid_directory.split("/")[-2]
@@ -41,20 +41,24 @@ def all_samples_elab(index_by="nick_unique_id"):
     for sample in samples["data"]:
         sampleid = sample["sampleID"]
         patient = sample["name"]
-        if patient == "SPECTRUM-OV-000": continue
-        response = requests.get(SAMPLE_URL.format(sampleid=sampleid), headers=headers)
+        if patient == "SPECTRUM-OV-000":
+            continue
+        response = requests.get(SAMPLE_URL.format(
+            sampleid=sampleid), headers=headers)
         sampleinfo = response.json()
-        metadata = dict([(meta["key"],meta["value"]) for meta in sampleinfo['data'] if "value" in meta])
+        metadata = dict([(meta["key"], meta["value"])
+                         for meta in sampleinfo['data'] if "value" in meta])
         if "scRNA IGO ID" in metadata:
             igo_project = metadata["scRNA IGO ID"]
         elif "IGO ID" in metadata:
             continue
         if "scRNA REX Sample ID" in metadata:
-            rex_prefix  = metadata["scRNA REX Sample ID"]
+            rex_prefix = metadata["scRNA REX Sample ID"]
         elif "REX Sample ID" in metadata:
             continue
         if igo_project != "" and rex_prefix != "":
-            igo = "Sample_{rex_prefix}_IGO_09443_{igo_project}".format(rex_prefix=rex_prefix, igo_project=igo_project)
+            igo = "Sample_{rex_prefix}_IGO_09443_{igo_project}".format(
+                rex_prefix=rex_prefix, igo_project=igo_project)
             igo = resolve_igo(igo)
             if not igo:
                 continue
@@ -62,14 +66,17 @@ def all_samples_elab(index_by="nick_unique_id"):
             site = metadata["Specimen Site"]
             if subsite.strip() == '':
                 subsite = site
-            sort = metadata["Submitted Populations"].replace("+","P").replace("-","N")
+            sort = metadata["Submitted Populations"].replace(
+                "+", "P").replace("-", "N")
             surgery = "S{}".format(int(metadata["Surgery #"])+1)
-            internal = "{patient}_{surgery}_{sort}_{site}".format(patient=patient, sort=sort, surgery=surgery, site="_".join(subsite.split())).upper()
+            internal = "{patient}_{surgery}_{sort}_{site}".format(
+                patient=patient, sort=sort, surgery=surgery, site="_".join(subsite.split())).upper()
             if index_by.lower() == 'unique_id':
                 primary_key = igo
             else:
                 primary_key = internal
-            relevant_metadata = {"site": site.upper(), "surgery": surgery, "sort": sort, "unique_id": igo, "nick_unique_id": internal, "patient_id": patient, "subsite": "_".join(subsite.upper().split()), "origin": "elab"}
+            relevant_metadata = {"site": site.upper(), "surgery": surgery, "sort": sort, "unique_id": igo, "nick_unique_id": internal,
+                                 "patient_id": patient, "subsite": "_".join(subsite.upper().split()), "origin": "elab"}
             index_samples[primary_key] = relevant_metadata
     return index_samples
 
@@ -83,21 +90,22 @@ def all_samples_gs(index_by="nick_unique_id"):
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file('../credentials.json', SCOPES)
-            creds = flow.run_local_server(port = 0)
+            flow = InstalledAppFlow.from_client_secrets_file(
+                '../credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
 
-    service = build('sheets', 'v4', credentials = creds)
+    service = build('sheets', 'v4', credentials=creds, cache_discovery=False)
     sheet = service.spreadsheets()
-    result = sheet.values().get(spreadsheetId = SAMPLE_SPREADSHEET_ID,
-                                range = SAMPLE_RANGE_NAME).execute()
+    result = sheet.values().get(spreadsheetId=SAMPLE_SPREADSHEET_ID,
+                                range=SAMPLE_RANGE_NAME).execute()
     values = result.get('values', [])
 
     samples = collections.defaultdict(dict)
     header = values.pop(0)
     for row in values:
-        sample = dict(zip(header,row))
+        sample = dict(zip(header, row))
         sample["origin"] = "google_sheet"
         samples[sample[index_by]] = sample
     return samples
@@ -132,7 +140,5 @@ def patient_samples(patient_id):
 
 def single_sample(nick_unique_id):
     samples = all_samples(index_by='nick_unique_id')
-    sample = samples.get(nick_unique_id,None)
+    sample = samples.get(nick_unique_id, None)
     return sample
-
-

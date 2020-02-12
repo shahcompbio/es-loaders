@@ -9,21 +9,22 @@ import os
 
 APP_VERSION = '2.0.0'
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
-logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+logging.basicConfig(format=LOGGING_FORMAT,
+                    stream=sys.stderr, level=logging.INFO)
 os.environ["ISABL_API_URL"] = 'https://isabl.shahlab.mskcc.org/api/v1/'
 os.environ['ISABL_CLIENT_ID'] = '1'
 
 
 def is_sample_level_analysis(analysis):
-    return analysis['application']['name']        == 'SCRNA' \
-           and analysis['application']['version'] == APP_VERSION \
-           and analysis['status']                 == 'SUCCEEDED'
+    return analysis['application']['name'] == 'SCRNA' \
+        and analysis['application']['version'] == APP_VERSION \
+        and analysis['status'] == 'SUCCEEDED'
 
 
 def is_individual_level_analysis(analysis):
-    return analysis['application']['name']        == 'SCRNA Individual Application' \
-           and analysis['application']['version'] == APP_VERSION \
-           and analysis['status']                 == 'SUCCEEDED'
+    return analysis['application']['name'] == 'SCRNA Individual Application' \
+        and analysis['application']['version'] == APP_VERSION \
+        and analysis['status'] == 'SUCCEEDED'
 
 
 def filter_analyses(analyses):
@@ -56,35 +57,39 @@ def filter_analyses(analyses):
     for analysis in analyses:
         row = {}
         if is_sample_level_analysis(analysis):
-            row['individual']         = analysis['targets'][0]['sample']['individual']['identifier']
-            row['app']                = 'SCRNA'
-            row['sample_id']          = analysis['targets'][0]['sample']['identifier']
+            row['individual'] = analysis['targets'][0]['sample']['individual']['identifier']
+            row['app'] = 'SCRNA'
+            row['sample_id'] = analysis['targets'][0]['sample']['identifier']
             try:
                 row['nick_sample_id'] = sample_look_up[row['sample_id']]
             except:
                 row['nick_sample_id'] = ''
-            row['rdata_path']         = analysis['results']['sce']
+            row['rdata_path'] = analysis['results']['sce']
 
         elif is_individual_level_analysis(analysis):
-            row['individual']     = analysis['individual_level_analysis']['identifier']
-            row['app']            = 'SCRNA Individual Application'
-            row['sample_id']      = ''  # individual SCRNA doesn't have a sample
-            row['nick_sample_id'] = ''  # individual SCRNA doesn't have a sample
-            row['rdata_path']     = analysis['results']['scanorama']
+            row['individual'] = analysis['individual_level_analysis']['identifier']
+            row['app'] = 'SCRNA Individual Application'
+            row['sample_id'] = ''  # individual SCRNA doesn't have a sample
+            # individual SCRNA doesn't have a sample
+            row['nick_sample_id'] = ''
+            row['rdata_path'] = analysis['results']['scanorama']
 
         else:
             continue
 
         row['analysis_pk'] = analysis['pk']
         row['app_version'] = APP_VERSION
-        row['modified']    = analysis['modified']
-        successful_analyses = successful_analyses.append(row, ignore_index=True)
+        row['modified'] = analysis['modified']
+        successful_analyses = successful_analyses.append(
+            row, ignore_index=True)
 
     # get latest analysis value for a given individual, app & app version (returned as series)
-    latest_successful_analyses = successful_analyses.groupby(['individual', 'app'])['analysis_pk'].max()
+    latest_successful_analyses = successful_analyses.groupby(['individual', 'app'])[
+        'analysis_pk'].max()
 
     # convert series to a dateframe
-    latest_successful_analyses = pd.DataFrame(latest_successful_analyses).reset_index()
+    latest_successful_analyses = pd.DataFrame(
+        latest_successful_analyses).reset_index()
 
     # return filtered dataframe containing all columns for latest analysis results
     return latest_successful_analyses.merge(successful_analyses, how='inner', on=['individual', 'app', 'analysis_pk'])
@@ -107,7 +112,8 @@ def get_scrna_rdata(individuals=None):
 
     if individuals is not None:
         df_individuals = pd.DataFrame(individuals, columns=['individual'])
-        filtered_analyses = filtered_analyses.merge(df_individuals, how='inner', on=['individual'])
+        filtered_analyses = filtered_analyses.merge(
+            df_individuals, how='inner', on=['individual'])
 
     for index, df_row in filtered_analyses.iterrows():
         row = {
@@ -125,6 +131,5 @@ def get_scrna_rdata(individuals=None):
     return json.dumps(latest_scrna_rdata)
 
 
-# get_scrna_rdata()
+print(get_scrna_rdata())
 # get_scrna_rdata(['SPECTRUM-OV-002', 'SPECTRUM-OV-003', 'SPECTRUM-OV-007'])
-
