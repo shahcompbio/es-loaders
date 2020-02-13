@@ -85,3 +85,7 @@ def update_samples_in_db(samples):
 
     for sample in samples:
         db.upsert(sample, Dashboard.dashboard_id == sample['dashboard_id'])
+
+
+if __name__ == '__main__':
+    transfer_all_new()
