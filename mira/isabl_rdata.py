@@ -128,8 +128,8 @@ def get_scrna_rdata(individuals=None):
         }
         latest_scrna_rdata.append(row)
 
-    return json.dumps(latest_scrna_rdata)
+    return latest_scrna_rdata
 
 
-print(get_scrna_rdata())
+# print(get_scrna_rdata())
 # get_scrna_rdata(['SPECTRUM-OV-002', 'SPECTRUM-OV-003', 'SPECTRUM-OV-007'])

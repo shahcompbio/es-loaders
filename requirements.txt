@@ -9,3 +9,4 @@ google-auth-httplib2
 google-auth-oauthlib
 click
 -e git+https://github.com/shahcompbio/isabl_cli.git@master#egg=isabl_cli
+tinydb
