@@ -18,7 +18,7 @@ def transfer_all_new():
     for sample in updated_samples:
         rdata_path = sample['rdata_path']
         dashboard_id = sample['dashboard_id']
-        cmd = f'rsync -a {rdata_path} spectrum-loader:{dashboard_id}.rdata"'
+        cmd = f'rsync -a {rdata_path} spectrum-loader:{dashboard_id}.rdata'
 
         process = subprocess.Popen(['/bin/bash', '-c', cmd])
         stdoutd, stderrd = process.communicate()
