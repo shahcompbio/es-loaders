@@ -238,9 +238,9 @@ def load_ticket(
 
     index = jira_ticket.lower()
     index_get_data = {
-        # f"qc": get_qc_data,
-        # f"segs": get_segs_data,
-        # f"bins": get_bins_data,
+        f"qc": get_qc_data,
+        f"segs": get_segs_data,
+        f"bins": get_bins_data,
         f"gc_bias": get_gc_bias_data,
     }
 
