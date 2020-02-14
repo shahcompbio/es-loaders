@@ -13,6 +13,7 @@ def transfer_all_new():
     updated_samples = get_updated_samples(samples)
 
     # transfer appropriate files to spectrum-loader
+    print('{} samples will be transferred'.format(str(len(updated_samples))))
     transferred_samples = []
     for sample in updated_samples:
         rdata_path = sample['rdata_path']
@@ -25,19 +26,24 @@ def transfer_all_new():
             transferred_samples.append(sample)
 
     # generate and transfer 'manifest' list of moved files
+    print('Creating manifest with {} samples'.format(
+        str(len(transferred_samples))))
     if os.path.exists('transferred.json'):
         os.remove('transferred.json')
     with open('transferred.json', 'w') as file:
         file.write(json.dumps(transferred_samples))
 
+    print('Moving manifest')
     cmd = f'rsync -a transferred.json spectrum-loader:transferred.json'
     subprocess.Popen(['/bin/bash', '-c', cmd])
 
     # move all files
+    print('Moving files')
     subprocess.Popen(
         ['/bin/bash', '-c', 'ssh spectrum-loader sudo mv *.rdata /dat/mira/.'])
 
     # update appropriate records in db
+    print('Update local db')
     update_samples_in_db(transferred_samples)
 
 
