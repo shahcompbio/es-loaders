@@ -15,14 +15,14 @@ from analysis_loader import AnalysisLoader
 
 """
 Eli Havasov 1-27-2021
-loadalhena.py is based off of loadmontage.py from 
+loadalhena.py is based off of loadmontage.py from
 https://github.com/shahcompbio/montageloader2.
 
 Alhena is the new version of Montage. Alhena uses ElasticSearch version 7+
 whereas Montage does not. Newer version does not support document mappings
 so code changes were necessary for Alhena.
 
-Montage had an index per ticket  with 4 document types (segs, bins, qc 
+Montage had an index per ticket  with 4 document types (segs, bins, qc
 & gc_bias), whereas Alhena has 4 different indexes per ticket for the
 different types.
 
@@ -133,6 +133,15 @@ def get_bins_data(hmmcopy_data):
 
 def get_gc_bias_data(hmmcopy_data):
     data = hmmcopy_data['gc_metrics']
+
+    gc_cols = list(range(101))
+    gc_bias_df = pd.DataFrame(columns=['cell_id', 'gc_percent', 'value'])
+    for n in gc_cols:
+        new_df = data.loc[:, ['cell_id', str(n)]]
+        new_df.columns = ['cell_id', 'value']
+        new_df['gc_percent'] = n
+        gc_bias_df = gc_bias_df.append(new_df, ignore_index=True)
+
     # data = data.merge(hmmcopy_data['annotation_metrics'][[
     #                   'cell_id', 'experimental_condition']], on='cell_id', how='left')
 
@@ -158,7 +167,7 @@ def get_gc_bias_data(hmmcopy_data):
     #            'gc_percent', 'high_ci', 'low_ci', 'median']
     # data = data.reset_index()[columns]
 
-    return data
+    return gc_bias_df
 
 
 @click.command()
@@ -229,9 +238,9 @@ def load_ticket(
 
     index = jira_ticket.lower()
     index_get_data = {
-        f"qc": get_qc_data,
-        f"segs": get_segs_data,
-        f"bins": get_bins_data,
+        # f"qc": get_qc_data,
+        # f"segs": get_segs_data,
+        # f"bins": get_bins_data,
         f"gc_bias": get_gc_bias_data,
     }
 
