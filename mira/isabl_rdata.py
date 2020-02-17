@@ -84,7 +84,7 @@ def filter_analyses(analyses):
             row, ignore_index=True)
 
     # get latest analysis value for a given individual, app & app version (returned as series)
-    latest_successful_analyses = successful_analyses.groupby(['individual', 'app'])[
+    latest_successful_analyses = successful_analyses.groupby(['individual', 'sample_id', 'app', ])[
         'analysis_pk'].max()
 
     # convert series to a dateframe
@@ -92,7 +92,7 @@ def filter_analyses(analyses):
         latest_successful_analyses).reset_index()
 
     # return filtered dataframe containing all columns for latest analysis results
-    return latest_successful_analyses.merge(successful_analyses, how='inner', on=['individual', 'app', 'analysis_pk'])
+    return latest_successful_analyses.merge(successful_analyses, how='inner', on=['individual', 'sample_id', 'app', 'analysis_pk'])
 
 
 def get_samples():
