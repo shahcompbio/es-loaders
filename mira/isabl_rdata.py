@@ -56,15 +56,22 @@ def filter_analyses(analyses):
 
     for analysis in analyses:
         row = {}
+        row['analysis_pk'] = analysis['pk']
+        row['app_version'] = APP_VERSION
+        row['modified'] = analysis['modified']
+
         if is_sample_level_analysis(analysis):
             row['individual'] = analysis['targets'][0]['sample']['individual']['identifier']
             row['app'] = 'SCRNA'
             row['sample_id'] = analysis['targets'][0]['sample']['identifier']
+            row['rdata_path'] = analysis['results']['sce']
             try:
                 row['nick_sample_id'] = sample_look_up[row['sample_id']]
+                successful_analyses = successful_analyses.append(
+                    row, ignore_index=True)
             except:
+                print(row['sample_id'] + " not found in sample list")
                 row['nick_sample_id'] = ''
-            row['rdata_path'] = analysis['results']['sce']
 
         elif is_individual_level_analysis(analysis):
             row['individual'] = analysis['individual_level_analysis']['identifier']
@@ -73,18 +80,11 @@ def filter_analyses(analyses):
             # individual SCRNA doesn't have a sample
             row['nick_sample_id'] = ''
             row['rdata_path'] = analysis['results']['scanorama']
-
-        else:
-            continue
-
-        row['analysis_pk'] = analysis['pk']
-        row['app_version'] = APP_VERSION
-        row['modified'] = analysis['modified']
-        successful_analyses = successful_analyses.append(
-            row, ignore_index=True)
+            successful_analyses = successful_analyses.append(
+                row, ignore_index=True)
 
     # get latest analysis value for a given individual, app & app version (returned as series)
-    latest_successful_analyses = successful_analyses.groupby(['individual', 'sample_id', 'app', ])[
+    latest_successful_analyses = successful_analyses.groupby(['individual', 'nick_sample_id', 'app', ])[
         'analysis_pk'].max()
 
     # convert series to a dateframe
@@ -92,7 +92,7 @@ def filter_analyses(analyses):
         latest_successful_analyses).reset_index()
 
     # return filtered dataframe containing all columns for latest analysis results
-    return latest_successful_analyses.merge(successful_analyses, how='inner', on=['individual', 'sample_id', 'app', 'analysis_pk'])
+    return latest_successful_analyses.merge(successful_analyses, how='inner', on=['individual', 'nick_sample_id', 'app', 'analysis_pk'])
 
 
 def get_samples():
