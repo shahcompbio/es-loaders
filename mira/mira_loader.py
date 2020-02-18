@@ -41,10 +41,8 @@ def load_analysis(filepath, dashboard_id, type, host, port, metadata=None):
 def _get_filepath(filepath, dashboard_id, type):
     if filepath.endswith(".rdata"):
         return filepath
-    elif type == "sample":
+    else:
         return filepath + dashboard_id + ".rdata"
-    elif type == "patient":
-        return filepath + dashboard_id + "_scanorama.rdata"
 
 
 def load_sample_statistics(data, sample_id, host="localhost", port=9200):
@@ -153,7 +151,7 @@ def load_dashboard_entry(type, dashboard_id, metadata=None, host="localhost", po
         "dashboard_id": dashboard_id,
         "type": type,
         "patient_id": metadata_records[0]["patient_id"],
-        "sort": metadata_records[0]["sort_parameters"],
+        "sort": list(set([datum['sort_parameters'] for datum in metadata_records])),
         "sample_ids": [datum["nick_unique_id"] for datum in metadata_records],
         "surgery": list(set([datum["time"] for datum in metadata_records])),
         "treatment": list(set([datum["therapy"] for datum in metadata_records])),

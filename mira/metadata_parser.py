@@ -10,7 +10,7 @@ import csv
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 SAMPLE_SPREADSHEET_ID = '1plhIL1rH2IuQ8b_komjAUHKKrnYPNDyhvNNRsTv74u8'
-SAMPLE_RANGE_NAME = 'sample_metadata!A1:L'
+SAMPLE_RANGE_NAME = 'sample_metadata'
 
 
 SORT_ENCODER = {'singlet, live, CD45+': 'CD45P',
@@ -58,17 +58,15 @@ class MiraMetadata(object):
     def sample_ids(self):
         return [row["nick_unique_id"] for row in self.data]
 
-    def patient_sort_ids(self):
+    def patient_ids(self):
         df = pd.DataFrame.from_records(self.data)
 
-        patient_df = df[['patient_id', 'sort_parameters']].drop_duplicates()
+        patient_df = df[['patient_id']].drop_duplicates()
 
-        return [str(row[0]) + "_" + str(row[1]) for row in patient_df.values.tolist()]
+        return [str(row[0]) for row in patient_df.values.tolist()]
 
-    def support_sample_ids(self, patient_sort_id):
-        [patient_id, sort] = patient_sort_id.split("_")
-
-        return [row['nick_unique_id'] for row in self.data if row['patient_id'] == patient_id and row['sort_parameters'] == sort]
+    def support_sample_ids(self, patient_id):
+        return [row['nick_unique_id'] for row in self.data if row['patient_id'] == patient_id]
 
     def get_data(self, sample_ids):
         data = dict(zip(self.sample_ids(), self.data))
@@ -77,6 +75,7 @@ class MiraMetadata(object):
 
 
 # metadata = MiraMetadata()
+# print(metadata.patient_ids())
 # print(metadata.data)
 # print(metadata.get_data(['SPECTRUM-OV-054_S1_CD45N_INFRACOLIC_OMENTUM']))
 # print(metadata.support_sample_ids("SPECTRUM-OV-014_CD45P"))

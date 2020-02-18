@@ -15,7 +15,7 @@ class scRNAParser():
         return set(self.data.colData["sample"])
 
     def get_cells(self):
-        samples = self.data.colData["sample"]
+        samples = self.data.colData["Sample"]
         barcodes = self.data.colData["Barcode"]
         sample_barcodes = zip(barcodes, samples)
         sample_barcodes = filter(
@@ -71,7 +71,7 @@ class scRNAParser():
             for j in range(matrix.shape[1]):
                 cell = matrix[i, j]
                 if float(cell) != 0.0:
-                    symbol = rowdata["Symbol"][i]
+                    symbol = list(self.data.rownames)[i]
                     barcode = coldata["Barcode"][j]
                     assay_matrix[barcode][symbol] = cell
         return dict(assay_matrix)
@@ -99,7 +99,7 @@ class scRNAParser():
         # ##################################################################
 
         statistics["Mito20"] = len(
-            list(filter(lambda x: x < 20, coldata["pct_counts_mito"])))
+            list(filter(lambda x: x < 20, coldata["pct_counts_mitochondrial"])))
         statistics["Estimated Number of Cells"] = len(coldata["Barcode"])
         statistics["Median UMI Counts"] = int(numpy.median(total_counts))
         statistics["Number of Reads"] = int(numpy.sum(cell_counts))
