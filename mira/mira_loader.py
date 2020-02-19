@@ -4,6 +4,7 @@ import sys
 import math
 import yaml
 import logging
+import itertools
 from mira.metadata_parser import MiraMetadata
 from mira.rho_loader import get_rho_celltypes
 from mira.mira_cleaner import clean_analysis
@@ -126,29 +127,19 @@ def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
 
 
 def get_gene_record_generator(cells, gene_symbols, cell_barcodes, gene_matrix, dashboard_id):
-    for i in range(gene_matrix.shape[0]):
-        for j in range(gene_matrix.shape[1]):
-            log_count = gene_matrix[i, j]
-            if float(log_count) != 0.0 and cell_barcodes[j] in cells:
+    num_genes, num_cells = gene_matrix.shape
+    for row in range(num_genes):
+        k = gene_matrix.indptr[row]
+        l = gene_matrix.indptr[row+1]
+        for data, column in zip(gene_matrix.data[k:l], gene_matrix.indices[k:l]):
+            if cell_barcodes[column] in cells and float(data) != 0.0:
                 record = {
-                    "cell_id": cell_barcodes[j],
-                    "gene": gene_symbols[i],
-                    "log_count": float(log_count),
+                    "cell_id": cell_barcodes[column],
+                    "gene": gene_symbols[row],
+                    "log_count": float(data),
                     "dashboard_id": dashboard_id
                 }
                 yield record
-
-    # for cell in cells:
-    #     genes = gene_matrix[cell]
-
-    #     for gene, log_count in genes.items():
-    #         record = {
-    #             "cell_id": cell,
-    #             "gene": gene,
-    #             "log_count": log_count,
-    #             "dashboard_id": dashboard_id
-    #         }
-    #         yield record
 
 
 def load_dashboard_entry(type, dashboard_id, metadata=None, host="localhost", port=9200):
