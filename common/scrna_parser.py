@@ -66,15 +66,17 @@ class scRNAParser():
         barcodes = self.data.colData["Barcode"]
         genes = self.data.rownames
         matrix = self.data.assays[assay]
-        assay_matrix = collections.defaultdict(dict)
-        for i in range(matrix.shape[0]):
-            for j in range(matrix.shape[1]):
-                cell = matrix[i, j]
-                if float(cell) != 0.0:
-                    symbol = genes[i]
-                    barcode = barcodes[j]
-                    assay_matrix[barcode][symbol] = cell
-        return dict(assay_matrix)
+
+        return [genes, barcodes, matrix]
+        # assay_matrix = collections.defaultdict(dict)
+        # for i in range(matrix.shape[0]):
+        #     for j in range(matrix.shape[1]):
+        #         cell = matrix[i, j]
+        #         if float(cell) != 0.0:
+        #             symbol = genes[i]
+        #             barcode = barcodes[j]
+        #             assay_matrix[barcode][symbol] = cell
+        # return dict(assay_matrix)
 
     def get_statistics(self):
         count_assay = self.data.get_assay("counts")
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     sample_id = parser.get_samples()
 
     # site = parser.data.colData["site"]
-    print(parser.get_dim_red())
+    # print(parser.get_dim_red())
     # print(parser.get_gene_matrix("SPECTRUM-OV-041_S1_CD45N_INFRACOLIC_OMENTUM"))
     # site = parser.data.colData["cell_type"]
     # print(site)

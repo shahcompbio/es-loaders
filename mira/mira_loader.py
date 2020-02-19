@@ -116,26 +116,39 @@ def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
 
     cells = list(redim.keys())
 
-    genes = data.get_gene_matrix()
+    [gene_symbols, cell_barcodes, gene_matrix] = data.get_gene_matrix()
 
-    gene_records = get_gene_record_generator(cells, genes, dashboard_id)
+    gene_records = get_gene_record_generator(
+        cells, gene_symbols, cell_barcodes, gene_matrix, dashboard_id)
     logger.info(" BEGINNING LOAD")
     load_records(DASHBOARD_GENES_INDEX + dashboard_id.lower(),
                  gene_records, host=host, port=port)
 
 
-def get_gene_record_generator(cells, gene_matrix, dashboard_id):
-    for cell in cells:
-        genes = gene_matrix[cell]
+def get_gene_record_generator(cells, gene_symbols, cell_barcodes, gene_matrix, dashboard_id):
+    for i in range(gene_matrix.shape[0]):
+        for j in range(gene_matrix.shape[1]):
+            log_count = gene_matrix[i, j]
+            if float(log_count) != 0.0 and cell_barcodes[j] in cells:
+                record = {
+                    "cell_id": cell_barcodes[j],
+                    "gene": gene_symbols[i],
+                    "log_count": float(log_count),
+                    "dashboard_id": dashboard_id
+                }
+                yield record
 
-        for gene, log_count in genes.items():
-            record = {
-                "cell_id": cell,
-                "gene": gene,
-                "log_count": log_count,
-                "dashboard_id": dashboard_id
-            }
-            yield record
+    # for cell in cells:
+    #     genes = gene_matrix[cell]
+
+    #     for gene, log_count in genes.items():
+    #         record = {
+    #             "cell_id": cell,
+    #             "gene": gene,
+    #             "log_count": log_count,
+    #             "dashboard_id": dashboard_id
+    #         }
+    #         yield record
 
 
 def load_dashboard_entry(type, dashboard_id, metadata=None, host="localhost", port=9200):
