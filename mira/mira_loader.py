@@ -115,18 +115,17 @@ def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
     redim = data.get_dim_red(
         'scanorama_UMAP') if type == "patient" else data.get_dim_red()
 
-    cells = list(redim.keys())
-
     [gene_symbols, cell_barcodes, gene_matrix] = data.get_gene_matrix()
 
     gene_records = get_gene_record_generator(
-        cells, gene_symbols, cell_barcodes, gene_matrix, dashboard_id)
+        redim, gene_symbols, cell_barcodes, gene_matrix, dashboard_id)
     logger.info(" BEGINNING LOAD")
     load_records(DASHBOARD_GENES_INDEX + dashboard_id.lower(),
                  gene_records, host=host, port=port)
 
 
-def get_gene_record_generator(cells, gene_symbols, cell_barcodes, gene_matrix, dashboard_id):
+def get_gene_record_generator(redim, gene_symbols, cell_barcodes, gene_matrix, dashboard_id):
+    cells = list(redim.keys())
     num_genes, num_cells = gene_matrix.shape
     for row in range(num_genes):
         k = gene_matrix.indptr[row]
@@ -137,7 +136,9 @@ def get_gene_record_generator(cells, gene_symbols, cell_barcodes, gene_matrix, d
                     "cell_id": cell_barcodes[column],
                     "gene": gene_symbols[row],
                     "log_count": float(data),
-                    "dashboard_id": dashboard_id
+                    "dashboard_id": dashboard_id,
+                    "x": redim[cell_barcodes[column]][0],
+                    "y": redim[cell_barcodes[column]][1]
                 }
                 yield record
 
