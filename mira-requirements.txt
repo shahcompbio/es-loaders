@@ -1,0 +1,12 @@
+elasticsearch
+pandas
+requests
+pyyaml
+rpy2
+scipy
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+click
+-e git+https://github.com/shahcompbio/isabl_cli.git@master#egg=isabl_cli
+tinydb
