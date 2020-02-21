@@ -72,15 +72,6 @@ class scRNAParser():
         matrix = self.data.assays[assay]
 
         return [genes, barcodes, matrix]
-        # assay_matrix = collections.defaultdict(dict)
-        # for i in range(matrix.shape[0]):
-        #     for j in range(matrix.shape[1]):
-        #         cell = matrix[i, j]
-        #         if float(cell) != 0.0:
-        #             symbol = genes[i]
-        #             barcode = barcodes[j]
-        #             assay_matrix[barcode][symbol] = cell
-        # return dict(assay_matrix)
 
     def get_statistics(self):
         count_assay = self.data.get_assay("counts")
