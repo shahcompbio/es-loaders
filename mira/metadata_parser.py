@@ -73,8 +73,15 @@ class MiraMetadata(object):
 
         return [data[sample_id] for sample_id in sample_ids]
 
+    def get_igo_to_sample_id(self, igo_id):
+        [sample_id] = [record['nick_unique_id']
+                       for record in self.data if igo_id == record['unique_id']]
+
+        return sample_id
+
 
 # metadata = MiraMetadata()
+# print(metadata.get_igo_to_sample_id('Sample_042AS_CD45P_IGO_09443_V_3'))
 # print(metadata.patient_ids())
 # print(metadata.data)
 # print(metadata.get_data(['SPECTRUM-OV-054_S1_CD45N_INFRACOLIC_OMENTUM']))

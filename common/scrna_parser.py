@@ -11,16 +11,20 @@ class scRNAParser():
         self.path = filePath
         self.data = SingleCellExperiment.fromRData(self.path)
 
-    def get_samples(self):
-        return set(self.data.colData["sample"])
-
     def get_cells(self):
         samples = self.data.colData["Sample"]
+        samples = [sample.split("/")[-1] for sample in samples]
         barcodes = self.data.colData["Barcode"]
-        sample_barcodes = zip(barcodes, samples)
-        sample_barcodes = filter(
-            lambda cell: cell[0] in barcodes, sample_barcodes)
-        return dict(sample_barcodes)
+        sample_barcodes = [name[0] + ":" + name[1]
+                           for name in zip(barcodes, samples)]
+        return sample_barcodes
+
+    def get_samples(self):
+        barcodes = self.get_cells()
+        samples = self.data.colData["Sample"]
+        samples = [sample.split("/")[-1] for sample in samples]
+
+        return dict(zip(barcodes, samples))
 
     def get_dim_red(self, embedding="UMAP", min_neighbors=5, neighbor_dist=1):
         barcodes = self.get_cells()
@@ -63,7 +67,7 @@ class scRNAParser():
         return self.data.assayNames
 
     def get_gene_matrix(self, assay="logcounts"):
-        barcodes = self.data.colData["Barcode"]
+        barcodes = self.get_cells()
         genes = self.data.rownames
         matrix = self.data.assays[assay]
 
@@ -116,23 +120,26 @@ class scRNAParser():
         return dict(zip(celltypes, probabilities))
 
     def get_celltype_probability(self, celltype):
+        barcodes = self.get_cells()
         coldata = self.data.colData
         celltype = scRNAParser.unformat_celltype(celltype)
-        probabilities = [0.0 for _ in coldata["Barcode"]]
+        probabilities = [0.0 for _ in barcodes]
         if celltype in coldata:
             probabilities = coldata[celltype]
-        return dict(zip(coldata["Barcode"], probabilities))
+        return dict(zip(barcodes, probabilities))
 
     def get_pathway(self, pathway):
         coldata = self.data.colData
+        barcodes = self.get_cells()
         assert pathway in coldata, "DNA repair type not computed."
-        return dict(zip(coldata["Barcode"], coldata[pathway]))
+        return dict(zip(barcodes, coldata[pathway]))
 
     def get_exhausted_probability(self):
         # Needs to grab from a different rData file, but this is the gist of the code
         coldata = self.data.colData
+        barcodes = self.get_cells()
         assert 'Exhausted_prob' in coldata, "Exhausted probability not computed."
-        return dict(zip(coldata["Barcode"], coldata['Exhausted_prob']))
+        return dict(zip(barcodes, coldata['Exhausted_prob']))
 
 
 if __name__ == '__main__':

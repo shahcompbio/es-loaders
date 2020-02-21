@@ -25,6 +25,9 @@ logger = logging.getLogger('mira_loading')
 
 def load_analysis(filepath, dashboard_id, type, host, port, metadata=None):
 
+    if metadata is None:
+        metadata = MiraMetadata()
+
     logger.info("====================== " + dashboard_id)
     file = _get_filepath(filepath, dashboard_id, type)
     logger.info("Opening File: " + file)
@@ -33,7 +36,8 @@ def load_analysis(filepath, dashboard_id, type, host, port, metadata=None):
         logger.info("Load Sample Data")
         load_sample_statistics(data, dashboard_id, host=host, port=port)
 
-    load_dashboard_cells(data, type, dashboard_id, host=host, port=port)
+    load_dashboard_cells(data, type, dashboard_id,
+                         metadata, host=host, port=port)
     load_dashboard_genes(data, type, dashboard_id, host=host, port=port)
     load_dashboard_entry(type, dashboard_id,
                          metadata=metadata, host=host, port=port)
@@ -66,7 +70,7 @@ def get_stats_records_generator(stats, sample_id):
         yield record
 
 
-def load_dashboard_cells(data, type, dashboard_id, host="localhost", port=9200):
+def load_dashboard_cells(data, type, dashboard_id, metadata, host="localhost", port=9200):
     logger.info("LOADING DASHBOARD CELLS: " + dashboard_id)
 
     redim = data.get_dim_red(
@@ -74,18 +78,19 @@ def load_dashboard_cells(data, type, dashboard_id, host="localhost", port=9200):
 
     cells = list(redim.keys())
 
-    samples = data.get_cells()
+    samples = data.get_samples()
     celltypes = data.get_celltypes()
     rho_celltypes = get_rho_celltypes()
     celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
 
     cell_records = get_cells_generator(
-        cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id)
+        cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata)
+
     logger.info(" BEGINNING LOAD")
     load_records(DASHBOARD_CELLS_INDEX, cell_records, host=host, port=port)
 
 
-def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id):
+def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata):
 
     def get_cell_probabilities(cell):
         cell_probabilities = {}
@@ -103,7 +108,7 @@ def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_proba
             "cell_type": celltypes[cell],
             "x": redim[cell][0],
             "y": redim[cell][1],
-            "sample_id": samples[cell],
+            "sample_id": metadata.get_igo_to_sample_id(samples[cell]),
             ** cell_probabilities
         }
         yield record
@@ -143,10 +148,7 @@ def get_gene_record_generator(redim, gene_symbols, cell_barcodes, gene_matrix, d
                 yield record
 
 
-def load_dashboard_entry(type, dashboard_id, metadata=None, host="localhost", port=9200):
-
-    if metadata is None:
-        metadata = MiraMetadata()
+def load_dashboard_entry(type, dashboard_id, metadata, host="localhost", port=9200):
 
     logger.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
 
@@ -176,4 +178,4 @@ def _get_metadata(type, dashboard_id, metadata):
 
 
 if __name__ == '__main__':
-    load_dashboard_entry(sys.argv[1], sys.argv[2])
+    pass

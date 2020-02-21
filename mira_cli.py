@@ -176,6 +176,36 @@ def is_loaded(dashboard_id, type, host, port):
             }
         }
     }
+
+    if not es.indices.exists('dashboard_entry'):
+        __DEFAULT_SETTINGS = {
+            "settings": {
+                "index": {
+                    "max_result_window": 50000
+                }
+            }
+        }
+
+        __DEFAULT_MAPPING = {
+            'mappings': {
+                "dynamic_templates": [
+                            {
+                                "string_values": {
+                                    "match": "*",
+                                    "match_mapping_type": "string",
+                                    "mapping": {
+                                        "type": "keyword"
+                                    }
+                                }
+                            }
+                ]
+            }
+        }
+        es.indices.create(
+            index="dashboard_entry",
+            body={**__DEFAULT_SETTINGS, **__DEFAULT_MAPPING}
+        )
+
     result = es.search(index="dashboard_entry", body=QUERY)
 
     return result["hits"]["total"]["value"] > 0
