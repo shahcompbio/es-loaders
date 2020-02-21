@@ -1,0 +1,22 @@
+{
+    "state": "int",
+    "map": "float",
+    "cell_id": "str",
+    "modal_quantile": "str",
+    "end": "int",
+    "width": "int",
+    "cor_gc": "str",
+    "modal_curve": "str",
+    "ideal": "bool",
+    "sample_id": "str",
+    "start": "int",
+    "reads": "int",
+    "valid": "bool",
+    "gc": "float",
+    "caller": "str",
+    "chrom_number": "str",
+    "multiplier": "int",
+    "cor_map": "str",
+    "copy": "str"
+}
+

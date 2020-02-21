@@ -1,0 +1,24 @@
+{
+	"segs": {
+		"_size": {"enabled": true},
+		"properties": {
+			"cell_id": {"index": "not_analyzed", "type": "string"},
+			"end": {"index": "not_analyzed", "type": "long"},
+			"caller": {"index": "not_analyzed", "type": "string"},
+			"median": {"index": "not_analyzed", "type": "float"},
+			"start": {"index": "not_analyzed", "type": "long"},
+			"state": {"index": "not_analyzed", "type": "long"},
+			"chrom_number": {"index": "not_analyzed", "type": "string"},
+			"sample_id": {"index": "not_analyzed", "type": "string"}
+		},		
+ 		"dynamic_templates": [{
+ 			"string_values": {
+ 				"match_mapping_type": "string", 
+ 				"mapping": {"index": "not_analyzed", "type": "string"},
+ 				"match": "*"
+ 			}
+ 		}]
+ 	}
+}
+
+
