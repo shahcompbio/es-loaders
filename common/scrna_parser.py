@@ -19,6 +19,12 @@ class scRNAParser():
                            for name in zip(barcodes, samples)]
         return sample_barcodes
 
+    def get_sample_list(self):
+        samples = set([sample.split("/")[-1]
+                       for sample in self.data.colData["Sample"]])
+
+        return samples
+
     def get_samples(self):
         barcodes = self.get_cells()
         samples = self.data.colData["Sample"]
