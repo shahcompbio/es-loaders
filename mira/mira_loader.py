@@ -9,6 +9,7 @@ from mira.metadata_parser import MiraMetadata
 from mira.rho_loader import get_rho_celltypes
 from mira.mira_cleaner import clean_analysis
 from common.scrna_parser import scRNAParser
+from mira.cell_probability import CellTypeProbability
 from utils.elasticsearch import load_records, load_record
 
 
@@ -37,7 +38,7 @@ def load_analysis(filepath, dashboard_id, type, host, port, metadata=None):
         load_sample_statistics(data, dashboard_id, host=host, port=port)
 
     load_dashboard_cells(data, type, dashboard_id,
-                         metadata, host=host, port=port)
+                         metadata, filepath, host=host, port=port)
     load_dashboard_genes(data, type, dashboard_id, host=host, port=port)
     load_dashboard_entry(type, dashboard_id,
                          metadata=metadata, host=host, port=port)
@@ -70,7 +71,7 @@ def get_stats_records_generator(stats, sample_id):
         yield record
 
 
-def load_dashboard_cells(data, type, dashboard_id, metadata, host="localhost", port=9200):
+def load_dashboard_cells(data, type, dashboard_id, metadata, filepath, host="localhost", port=9200):
     logger.info("LOADING DASHBOARD CELLS: " + dashboard_id)
 
     redim = data.get_dim_red(
@@ -81,7 +82,12 @@ def load_dashboard_cells(data, type, dashboard_id, metadata, host="localhost", p
     samples = data.get_samples()
     celltypes = data.get_celltypes()
     rho_celltypes = get_rho_celltypes()
-    celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
+    # Currently need to pull probabilities via sample meta json files, so below code doesn't work
+    # celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
+
+    sample_list = [metadata.get_igo_to_sample_id(
+        sample) for sample in data.get_sample_list()]
+    celltype_probabilities = CellTypeProbability(filepath, sample_list)
 
     cell_records = get_cells_generator(
         cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata)
@@ -92,16 +98,20 @@ def load_dashboard_cells(data, type, dashboard_id, metadata, host="localhost", p
 
 def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata):
 
-    def get_cell_probabilities(cell):
-        cell_probabilities = {}
-        for celltype in rho_celltypes:
-            cell_probabilities[celltype +
-                               " probability"] = celltype_probabilities[celltype][cell]
+    # def get_cell_probabilities(cell):
+    #     cell_probabilities = {}
+    #     for celltype in rho_celltypes:
+    #         cell_probabilities[celltype +
+    #                            " probability"] = celltype_probabilities[celltype][cell]
 
-        return cell_probabilities
+    #     return cell_probabilities
 
     for cell in cells:
-        cell_probabilities = get_cell_probabilities(cell)
+        [barcode, sample] = cell.split(":")
+        sample = metadata.get_igo_to_sample_id(sample)
+        cell_probabilities = celltype_probabilities.get_cell_probabilities(
+            sample, barcode, celltypes=rho_celltypes)
+
         record = {
             "dashboard_id": dashboard_id,
             "cell_id": cell,
