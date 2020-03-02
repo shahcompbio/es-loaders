@@ -1,27 +1,32 @@
 import json
+from common.scrna_parser import scRNAParser
 
 
 class CellTypeProbability(object):
-    def __init__(self, filepath, sample_list):
+    def __init__(self, filepath, sample_list, celltypes):
         data = {}
+        self.celltypes = celltypes
+
         for sample in sample_list:
-            filename = filepath + sample + "_meta.json"
-            with open(filename) as json_file:
-                data_file = json.load(json_file)
-                data[sample] = data_file
+            try:
+                filename = filepath + sample + "_meta.json"
+                with open(filename) as json_file:
+                    data_file = json.load(json_file)
+                    data[sample] = data_file
+            except FileNotFoundError:
+                filename = filepath + sample + ".rdata"
+                data_file = scRNAParser(filename)
+                data[sample] = data_file.get_all_celltype_probability(
+                    celltypes)
 
         self.data = data
 
-    def get_cell_probabilities(self, sample, barcode, celltypes=None):
-
-        if celltypes is None:
-            celltypes = [format_celltype(celltype)
-                         for celltype in self.data[sample].keys()]
+    def get_cell_probabilities(self, sample, barcode):
 
         probabilities = {}
         sheet = self.data[sample]
 
-        for celltype in celltypes:
+        for celltype in self.celltypes:
             celltype_data = sheet[unformat_celltype(
                 celltype)] if unformat_celltype(celltype) in sheet else {}
 

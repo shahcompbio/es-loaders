@@ -82,12 +82,11 @@ def load_dashboard_cells(data, type, dashboard_id, metadata, filepath, host="loc
     samples = data.get_samples()
     celltypes = data.get_celltypes()
     rho_celltypes = get_rho_celltypes()
-    # Currently need to pull probabilities via sample meta json files, so below code doesn't work
-    # celltype_probabilities = data.get_all_celltype_probability(rho_celltypes)
 
     sample_list = [metadata.get_igo_to_sample_id(
         sample) for sample in data.get_sample_list()]
-    celltype_probabilities = CellTypeProbability(filepath, sample_list)
+    celltype_probabilities = CellTypeProbability(
+        filepath, sample_list, rho_celltypes)
 
     cell_records = get_cells_generator(
         cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata)
@@ -98,19 +97,11 @@ def load_dashboard_cells(data, type, dashboard_id, metadata, filepath, host="loc
 
 def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata):
 
-    # def get_cell_probabilities(cell):
-    #     cell_probabilities = {}
-    #     for celltype in rho_celltypes:
-    #         cell_probabilities[celltype +
-    #                            " probability"] = celltype_probabilities[celltype][cell]
-
-    #     return cell_probabilities
-
     for cell in cells:
         [barcode, sample] = cell.split(":")
         sample = metadata.get_igo_to_sample_id(sample)
         cell_probabilities = celltype_probabilities.get_cell_probabilities(
-            sample, barcode, celltypes=rho_celltypes)
+            sample, barcode)
 
         record = {
             "dashboard_id": dashboard_id,
