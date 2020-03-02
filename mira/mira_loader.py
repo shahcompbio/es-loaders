@@ -5,6 +5,7 @@ import math
 import yaml
 import logging
 import itertools
+import numpy
 from mira.metadata_parser import MiraMetadata
 from mira.rho_loader import get_rho_celltypes
 from mira.mira_cleaner import clean_analysis
@@ -130,23 +131,48 @@ def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
                  gene_records, host=host, port=port)
 
 
+for i in range(matrix.shape[0]):
+    for j in range(matrix.shape[1]):
+        cell = matrix[i, j]
+        if float(cell) != 0.0:
+            symbol = rowdata["Symbol"][i]
+            barcode = coldata["Barcode"][j]
+            assay_matrix[barcode][symbol] = cell
+
+
 def get_gene_record_generator(redim, gene_symbols, cell_barcodes, gene_matrix, dashboard_id):
     cells = list(redim.keys())
     num_genes, num_cells = gene_matrix.shape
-    for row in range(num_genes):
-        k = gene_matrix.indptr[row]
-        l = gene_matrix.indptr[row+1]
-        for data, column in zip(gene_matrix.data[k:l], gene_matrix.indices[k:l]):
-            if cell_barcodes[column] in cells and float(data) != 0.0:
-                record = {
-                    "cell_id": cell_barcodes[column],
-                    "gene": gene_symbols[row],
-                    "log_count": float(data),
-                    "dashboard_id": dashboard_id,
-                    "x": redim[cell_barcodes[column]][0],
-                    "y": redim[cell_barcodes[column]][1]
-                }
-                yield record
+    if isinstance(gene_matrix, numpy.ndarray):
+        for row in num_genes:
+            for column in num_cells:
+                data = gene_matrix[i, j]
+                if float(data) != 0.0:
+                    record = {
+                        "cell_id": cell_barcodes[column],
+                        "gene": gene_symbols[row],
+                        "log_count": float(data),
+                        "dashboard_id": dashboard_id,
+                        "x": redim[cell_barcodes[column]][0],
+                        "y": redim[cell_barcodes[column]][1]
+                    }
+                    yield record
+
+    else:
+        for row in range(num_genes):
+            k = gene_matrix.indptr[row]
+            l = gene_matrix.indptr[row+1]
+            for data, column in zip(gene_matrix.data[k:l], gene_matrix.indices[k:l]):
+                if cell_barcodes[column] in cells and float(data) != 0.0:
+                    record = {
+                        "cell_id": cell_barcodes[column],
+                        "gene": gene_symbols[row],
+                        "log_count": float(data),
+                        "dashboard_id": dashboard_id,
+                        "x": redim[cell_barcodes[column]][0],
+                        "y": redim[cell_barcodes[column]][1]
+                    }
+                    yield record
 
 
 def load_dashboard_entry(type, dashboard_id, metadata, host="localhost", port=9200):
