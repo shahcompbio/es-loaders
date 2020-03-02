@@ -98,8 +98,10 @@ class SingleCellExperiment(RS4):
         assert "Barcode" in coldata, "No Barcodes Found."
         barcodes = coldata["Barcode"]
         assert (len(genes), len(barcodes)) == assay.shape
+        if not isinstance(assay, numpy.ndarray):
+            assay = assay.toarray()
         assay_df = pandas.DataFrame(
-            data=assay.toarray(), index=numpy.array(genes), columns=numpy.array(barcodes))
+            data=assay, index=numpy.array(genes), columns=numpy.array(barcodes))
         return assay_df
 
     @property
