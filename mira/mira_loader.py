@@ -138,7 +138,7 @@ def get_gene_record_generator(redim, gene_symbols, cell_barcodes, gene_matrix, d
         for row in range(num_genes):
             for column in range(num_cells):
                 data = gene_matrix[row, column]
-                if float(data) != 0.0:
+                if cell_barcodes[column] in cells and float(data) != 0.0 and:
                     record = {
                         "cell_id": cell_barcodes[column],
                         "gene": gene_symbols[row],
