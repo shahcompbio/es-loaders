@@ -135,8 +135,8 @@ def get_gene_record_generator(redim, gene_symbols, cell_barcodes, gene_matrix, d
     cells = list(redim.keys())
     num_genes, num_cells = gene_matrix.shape
     if isinstance(gene_matrix, numpy.ndarray):
-        for row in num_genes:
-            for column in num_cells:
+        for row in range(num_genes):
+            for column in range(num_cells):
                 data = gene_matrix[i, j]
                 if float(data) != 0.0:
                     record = {
