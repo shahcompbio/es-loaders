@@ -13,22 +13,38 @@ class scRNAParser():
 
     def get_cells(self):
         samples = self.data.colData["Sample"]
-        samples = [sample.split("/")[-1] for sample in samples]
+        samples = [sample.split("/")[-1]
+                   for sample in self.data.colData["Sample"] if "_IGO_" in sample.split("/")[-1]]
+
+        if len(samples) == 0:
+            samples = [sample.split("/")[-2]
+                       for sample in self.data.colData["Sample"]]
         barcodes = self.data.colData["Barcode"]
         sample_barcodes = [name[0] + ":" + name[1]
                            for name in zip(barcodes, samples)]
         return sample_barcodes
 
     def get_sample_list(self):
-        samples = set([sample.split("/")[-1]
-                       for sample in self.data.colData["Sample"]])
+        samples = [sample.split("/")[-1]
+                   for sample in self.data.colData["Sample"] if "_IGO_" in sample.split("/")[-1]]
+
+        if len(samples) == 0:
+            samples = [sample.split("/")[-2]
+                       for sample in self.data.colData["Sample"]]
+
+        samples = set(samples)
 
         return samples
 
     def get_samples(self):
         barcodes = self.get_cells()
         samples = self.data.colData["Sample"]
-        samples = [sample.split("/")[-1] for sample in samples]
+        samples = [sample.split("/")[-1]
+                   for sample in self.data.colData["Sample"] if "_IGO_" in sample.split("/")[-1]]
+
+        if len(samples) == 0:
+            samples = [sample.split("/")[-2]
+                       for sample in self.data.colData["Sample"]]
 
         return dict(zip(barcodes, samples))
 
