@@ -60,7 +60,7 @@ def missing_dashboards(host='localhost', port=9200):
     for missing_sample_id in missing_sample_ids:
         logger.info(missing_sample_id)
 
-    patient_ids = metadata.patient_sort_ids()
+    patient_ids = metadata.patient_ids()
     missing_patient_ids = [
         patient_id for patient_id in patient_ids if not patient_id in loaded_dashboards]
 
