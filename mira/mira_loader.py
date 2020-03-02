@@ -131,15 +131,6 @@ def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
                  gene_records, host=host, port=port)
 
 
-for i in range(matrix.shape[0]):
-    for j in range(matrix.shape[1]):
-        cell = matrix[i, j]
-        if float(cell) != 0.0:
-            symbol = rowdata["Symbol"][i]
-            barcode = coldata["Barcode"][j]
-            assay_matrix[barcode][symbol] = cell
-
-
 def get_gene_record_generator(redim, gene_symbols, cell_barcodes, gene_matrix, dashboard_id):
     cells = list(redim.keys())
     num_genes, num_cells = gene_matrix.shape
