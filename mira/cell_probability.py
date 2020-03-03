@@ -13,7 +13,8 @@ class CellTypeProbability(object):
                 with open(filename) as json_file:
                     data_file = json.load(json_file)
                     data[sample] = data_file
-            except FileNotFoundError:
+            except FileNotFoundError as err:
+                print(err)
                 filename = filepath + sample + ".rdata"
                 data_file = scRNAParser(filename)
                 data[sample] = data_file.get_all_celltype_probability(
