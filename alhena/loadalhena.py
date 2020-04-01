@@ -133,6 +133,14 @@ def get_bins_data(hmmcopy_data):
 
 def get_gc_bias_data(hmmcopy_data):
     data = hmmcopy_data['gc_metrics']
+
+    gc_cols = list(range(101))
+    gc_bias_df = pd.DataFrame(columns=['cell_id', 'gc_percent', 'value'])
+    for n in gc_cols:
+        new_df = data.loc[:, ['cell_id', str(n)]]
+        new_df.columns = ['cell_id', 'value']
+        new_df['gc_percent'] = n
+        gc_bias_df = gc_bias_df.append(new_df, ignore_index=True)
     # data = data.merge(hmmcopy_data['annotation_metrics'][[
     #                   'cell_id', 'experimental_condition']], on='cell_id', how='left')
 
@@ -158,7 +166,7 @@ def get_gc_bias_data(hmmcopy_data):
     #            'gc_percent', 'high_ci', 'low_ci', 'median']
     # data = data.reset_index()[columns]
 
-    return data
+    return gc_bias_df
 
 
 @click.command()
