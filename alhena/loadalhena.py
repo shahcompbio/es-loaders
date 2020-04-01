@@ -265,7 +265,8 @@ def load_ticket(
             "jira_id": jira_ticket,
             "description": description
         }
-        elasticsearch_client.load_record(record, "analyses", jira_ticket)
+        elasticsearch_client.load_record(
+            analysis_record, "analyses", jira_ticket)
 
     else:
         AnalysisLoader().load_data(jira_ticket, ip_address, 9200)
