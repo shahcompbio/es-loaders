@@ -254,10 +254,10 @@ def load_ticket(
     logging.info(
         f"loading published dashboard record {jira_ticket}")
 
-    if description not None:
+    if description is not None:
         # Assuming not colossus so need to check that all the other fields are there
-        assert sample_id not None, "Must specify sample_id"
-        assert library_id is not None, "Must specify library_id"
+        assert sample_id is not None, "Must specify sample_id"
+        assert library_id is is not None, "Must specify library_id"
 
         analysis_record = {
             "sample_id": sample_id,
