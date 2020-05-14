@@ -58,7 +58,7 @@ def load_data(directory, patient_id):
 
         records.append(cell_record)
 
-    load_records('cellgenes2', records, host='localhost', port=9200)
+    load_records('cellgenes', records, host='localhost', port=9200)
 
 
 directory = '/Users/mcphera1/Scratch/mira_loading'
