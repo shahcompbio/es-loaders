@@ -79,8 +79,7 @@ class ElasticsearchClient():
 
     def load_bulk(self, index, records):
         try:
-            helpers.bulk(self.es, records, index=index,
-                         doc_type="_doc")
+            helpers.bulk(self.es, records, index=index)
         except Exception as e:
             logger.exception("ERROR WHILE LOADING BULK")
 

@@ -1,6 +1,0 @@
-elasticsearch
-pandas
-requests
-pyyaml
-scipy
-click

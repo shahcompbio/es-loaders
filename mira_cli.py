@@ -3,12 +3,11 @@ import logging
 import logging.handlers
 import os
 
-from mira.mira_loader import load_analysis as _load_analysis
-from mira.mira_cleaner import clean_analysis as _clean_analysis, delete_index
-from mira.mira_utils import get_new_ids
-from mira.rho_loader import load_rho as _load_rho
-from mira.metadata_parser import MiraMetadata
-from mira.verify import verify_indices, missing_dashboards as _missing_dashboards
+from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data
+from mira.mira_isabl import get_new_isabl_analyses
+from mira.mira_data import download_analyses_data, get_celltype_analyses, download_cohort_data
+from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho
+from mira.rho_loader import download_rho_data
 
 
 from elasticsearch import Elasticsearch
@@ -44,203 +43,90 @@ def main(ctx, host, port, debug):
 @main.command()
 @click.argument('data_directory')
 @click.pass_context
-@click.option('--type', required=True, type=click.Choice(['sample', 'patient'], case_sensitive=False), help="Type of dashboard")
+@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
 @click.option('--id', help="ID of dashboard")
 @click.option('--reload', is_flag=True, help="Force reload this library")
-@click.option('--load-support', is_flag=True, help="Load supporting samples")
+@click.option('--chunksize', help="How many milions of records to chunk matrix file", type=int)
+@click.option('--download',  is_flag=True,help="Download file if missing", type=int)
 @click.option('--load-new', is_flag=True, help="Load dashboards not currently in Mira")
-def load_analysis(ctx, data_directory, id, type, reload, load_support, load_new):
-    # one of ID or load_new must be present
-    assert id is not None or load_new is not None, "Must specify one of ID or load_new"
+def load_analysis(ctx, data_directory, id, type, reload, chunksize, download, load_new):
+    assert id is not None or load_new
 
-    metadata = MiraMetadata()
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
 
-    to_load = [[id, type]] if id is not None else [[new_id, type]
-                                                   for new_id in get_new_ids(type, ctx.obj['host'], ctx.obj['port'], metadata)]
+    if load_new:
+        analyses_metadata = get_new_isabl_analyses(load_new=True, es_host=es_host, es_port=es_port)
+    else:
+        analyses_metadata = get_new_isabl_analyses(dashboard_id=id, es_host=es_host, es_port=es_port)
+    analyses = [{**analysis, "directory": data_directory if data_directory.endswith(analysis["dashboard_id"]) else os.path.join(data_directory, analysis["dashboard_id"]) } for analysis in analyses_metadata]
 
-    if load_support:
-        assert not type == 'sample', 'Cannot load supporting samples for sample type'
+    if download:
+        download_analyses_data(analyses, data_directory)
 
-        to_load_new = []
-        for patient_dashboard in to_load:
-            to_load_new = to_load_new + [[sample_id, "sample"]
-                                         for sample_id in metadata.support_sample_ids(patient_dashboard[0])] + [patient_dashboard]
-
-        to_load = to_load_new
-
-    load_analysis_list(data_directory, to_load, ctx.obj['logger'], ctx.obj['host'],
-                       ctx.obj['port'], metadata=metadata, reload=reload)
-
-
-@main.command()
-@click.argument('filepath')
-@click.pass_context
-def update_to_v2(ctx, filepath):
-    es = Elasticsearch(
-        hosts=[{'host': ctx.obj['host'], 'port':ctx.obj['port']}])
-
-    new_entries = []
-    if es.indices.exists("dashboard_cells"):
-        NEW_QUERY = {
-            "size": 0,
-            "aggs": {
-                "agg_terms_dashboard_id": {
-                    "terms": {
-                        "field": "dashboard_id",
-                        "size": 1000,
-                        "order": {
-                            "_key": "asc"
-                        }
-                    }
-                }
-            }
+    for analysis in analyses:
+        metadata = {
+            "date": analysis["modified"]
         }
 
-        new_result = es.search(index="dashboard_cells", body=NEW_QUERY)
-
-        new_entries = [record["key"] for record in new_result["aggregations"]
-                       ["agg_terms_dashboard_id"]["buckets"]]
-
-        print(new_entries)
-
-    QUERY = {
-        "size": 10000
-    }
-    result = es.search(index="dashboard_entry", body=QUERY)
-
-    to_load = [[record["_source"]["dashboard_id"], record["_source"]["type"]]
-               for record in result["hits"]["hits"] if record["_source"]["dashboard_id"] not in new_entries]
-    print(to_load)
-    # load_analysis_list(filepath, to_load, ctx.obj['logger'], ctx.obj['host'],
-    #                    ctx.obj['port'], reload=True)
-
-    verify_indices(host=ctx.obj['host'], port=ctx.obj['port'])
-
-
-def load_analysis_list(filepath, to_load, logger, host, port, reload=False, metadata=None):
-
-    if metadata is None:
-        metadata = MiraMetadata()
-
-    for load_record in to_load:
-        load_id = load_record[0]
-        load_type = load_record[1]
         if reload:
-            _clean_analysis(load_id, load_type,
-                            host=host, port=port)
-        try:
-            if is_loaded(
-                    load_id, load_type, host=host, port=port):
-                logger.warning(
-                    "===== DASHBOARD has been loaded before - will skip: " + load_id)
+            _clean_analysis(analysis["dashboard_id"], host=es_host, port=es_port)
 
-            else:
-                _load_analysis(filepath, load_id, load_type, metadata=metadata,
-                               host=host, port=port)
-
-        except KeyboardInterrupt:
-            logger.exception()
-            _clean_analysis(load_id, load_type,
-                            host=host, port=port)
-            break
-
-        except:
-            logger.exception('Error while loading analysis: ' + load_id)
-            _clean_analysis(load_id, load_type,
-                            host=host, port=port)
-            continue
+        _load_analysis(analysis["directory"], analysis["dashboard_id"], es_host, es_port, chunksize=chunksize * int(1e6), metadata=metadata)
 
 
-def is_loaded(dashboard_id, type, host, port):
-    es = Elasticsearch(
-        hosts=[{'host': host, 'port': port}])
-    QUERY = {
-        "query": {
-            "bool": {
-                "filter": {
-                    "bool": {
-                        "must": [
-                            {
-                                "term": {
-                                    "dashboard_id": dashboard_id
-                                }
-                            },
-                            {
-                                "term": {
-                                    "type": type
-                                }
-                            }
-                        ]
-                    }
-                }
-            }
-        }
+@main.command()
+@click.argument('data_directory')
+@click.pass_context
+@click.option('--reload', is_flag=True, help="Force reload this library")
+@click.option('--chunksize', help="How many milions of records to chunk matrix file", type=int)
+@click.option('--download',  is_flag=True,help="Download file if missing", type=int)
+def load_cohort(ctx, data_directory, reload, chunksize, download):
+
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    cohort_analysis = get_new_isabl_analyses("cohort", es_host=es_host, es_port=es_port)
+    cohort_celltype_analyses = get_celltype_analyses(cohort_analysis)
+
+    if download:
+        download_cohort_data(cohort_analysis, cohort_celltype_analyses, data_directory)
+
+    metadata = {
+        "date": cohort_analysis["modified"]
     }
+    
+    # if reload:
+    #     _clean_analysis(cohort_analysis["dashboard_id"], host=es_host, port=es_port)
 
-    if not es.indices.exists('dashboard_entry'):
-        __DEFAULT_SETTINGS = {
-            "settings": {
-                "index": {
-                    "max_result_window": 50000
-                }
-            }
-        }
+    # _load_analysis(os.path.join(data_directory), cohort_analysis["dashboard_id"], es_host, es_port, isCohort=True, chunksize=chunksize * int(1e6), metadata=metadata)
 
-        __DEFAULT_MAPPING = {
-            'mappings': {
-                "dynamic_templates": [
-                            {
-                                "string_values": {
-                                    "match": "*",
-                                    "match_mapping_type": "string",
-                                    "mapping": {
-                                        "type": "keyword"
-                                    }
-                                }
-                            }
-                ]
-            }
-        }
-        es.indices.create(
-            index="dashboard_entry",
-            body={**__DEFAULT_SETTINGS, **__DEFAULT_MAPPING}
-        )
+    for analysis in cohort_celltype_analyses:
+        if reload:
+            _clean_analysis(analysis["dashboard_id"], host=es_host, port=es_port)
 
-    result = es.search(index="dashboard_entry", body=QUERY)
-
-    return result["hits"]["total"]["value"] > 0
-
+        load_celltype_data(data_directory, analysis["dashboard_id"], es_host, es_port, chunksize=chunksize * int(1e6), metadata=metadata)
 
 @main.command()
+@click.argument('github_token')
+@click.option('--reload', is_flag=True, help="Force reload")
 @click.pass_context
-def load_rho(ctx):
+def load_rho(ctx, github_token, reload):
     host = ctx.obj['host']
     port = ctx.obj['port']
-    _load_rho(host, port)
+    if reload:
+        _clean_rho(host, port)
 
+    data = download_rho_data(github_token)
+    _load_rho(data, host=host, port=port)
 
-@main.command()
-@click.pass_context
-def verify_load(ctx):
-    host = ctx.obj['host']
-    port = ctx.obj['port']
-    verify_indices(host=host, port=port)
-
-
-@main.command()
-@click.pass_context
-def missing_dashboards(ctx):
-    host = ctx.obj['host']
-    port = ctx.obj['port']
-    _missing_dashboards(host=host, port=port)
 
 
 @main.command()
 @click.argument('dashboard_id')
-@click.argument('type')
 @click.pass_context
-def clean_analysis(ctx, dashboard_id, type):
-    _clean_analysis(dashboard_id, type,
+def clean_analysis(ctx, dashboard_id):
+    _clean_analysis(dashboard_id,
                     host=ctx.obj['host'], port=ctx.obj['port'])
 
 
