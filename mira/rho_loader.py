@@ -1,45 +1,33 @@
 
 import os
-from common.genemarkermatrix import GeneMarkerMatrix
-from utils.elasticsearch import load_records
+import pandas as pd
+import numpy as np
+import mira.constants as constants
 
 import logging
 logger = logging.getLogger("mira_loading")
 
 
-def get_rho(filename=None):
-    if not filename:
-        package_directory = os.path.dirname(os.path.abspath(__file__))
-        filename = os.path.join(package_directory, "markers.yaml")
-    assert os.path.exists(filename), "Rho yaml not found."
-    matrix = GeneMarkerMatrix.read_yaml(filename)
-    return matrix
+def download_rho_data(token):
+    logger.info("======================= Downloading marker genes")
+    marker_genes = pd.read_csv(constants.MARKER_GENES_URL+ "?token=" + token)
+    marker_genes = marker_genes.transpose()
 
+    gene_list = marker_genes[:'Unnamed: 0'].values.tolist()[0]
+    marker_genes.columns = gene_list
+    marker_genes = marker_genes.iloc[1:]
 
-def get_rho_celltypes():
-    rho = get_rho()
-    return rho.cells
+    marker_genes.index.name = 'cell_type'
+    marker_genes = marker_genes.reset_index(drop=False)
+    marker_genes['cell_type'] = marker_genes['cell_type'].str.replace('.', ' ')
+    cell_types = marker_genes['cell_type'].values
 
+    rows, cols = np.where(marker_genes.values == 1)
+    marker_gene_list = list(zip(marker_genes.index[rows], marker_genes.columns[cols]))
 
-def get_rho_all_markers():
-    rho = get_rho()
-    return dict(rho.marker_list)
+    
+    logger.info(f'{len(cell_types)} cell types with total {len(marker_gene_list)} marker genes')
 
+    data = [{"cell_type": cell_types[marker_pair[0]], "gene": marker_pair[1]} for marker_pair in marker_gene_list]
 
-def load_rho(host, port):
-    logger.info("======================= LOADING RHO")
-    rho = get_rho_all_markers()
-
-    records = []
-    for celltype, markers in rho.items():
-        logger.info(celltype + ": " + str(len(markers)) + " markers")
-        celltype_records = [{"celltype": celltype,
-                             "marker": marker} for marker in markers]
-
-        records.extend(celltype_records)
-
-    load_records("rho_markers", records, host=host, port=port)
-
-
-if __name__ == "__main__":
-    load_rho()
+    return data
