@@ -13,11 +13,11 @@ logger = logging.getLogger('mira_loading')
 
 
 ## main method. Will load both data and metadata records needed for Mira
-def load_analysis(directory, dashboard_id, host, port, isCohort=False, chunksize=None, metadata={}):
+def load_analysis(directory, type, dashboard_id, host, port, isCohort=False, chunksize=None, metadata={}):
     logger.info("====================== " + dashboard_id)
     load_data(directory, dashboard_id, host, port,isCohort=isCohort, chunksize=chunksize, metadata=metadata)
 
-    load_dashboard_entry(directory, dashboard_id, metadata, host, port)
+    load_dashboard_entry(directory, type,dashboard_id, metadata, host, port)
 
 
     logger.info("Done.")
@@ -28,7 +28,7 @@ def load_analysis(directory, dashboard_id, host, port, isCohort=False, chunksize
 
 ## Loading metadata for Mira
 ## Assumes samples_metadata.json file exists
-def load_dashboard_entry(directory, dashboard_id, dashboard_metadata, host, port):
+def load_dashboard_entry(directory, type, dashboard_id, dashboard_metadata, host, port):
 
     logger.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
 
@@ -40,6 +40,7 @@ def load_dashboard_entry(directory, dashboard_id, dashboard_metadata, host, port
 
     record = {
         "dashboard_id": dashboard_id,
+        "type": type,
         "samples": samples[:].to_dict(orient='records'),
         **dashboard_metadata
     }
@@ -210,14 +211,14 @@ def get_records(cells, matrix):
 
 
 ## main method. Will load both data and metadata records needed for Mira
-def load_analysis(directory, dashboard_id, host, port, isCohort=False, chunksize=None, metadata={}):
-    logger.info("====================== " + dashboard_id)
-    load_data(directory, dashboard_id, host, port,isCohort=isCohort, chunksize=chunksize, metadata=metadata)
+# def load_analysis(directory, dashboard_id, host, port, isCohort=False, chunksize=None, metadata={}):
+#     logger.info("====================== " + dashboard_id)
+#     load_data(directory, dashboard_id, host, port,isCohort=isCohort, chunksize=chunksize, metadata=metadata)
 
-    load_dashboard_entry(directory, dashboard_id, metadata, host, port)
+#     load_dashboard_entry(directory, dashboard_id, metadata, host, port)
 
 
-    logger.info("Done.")
+#     logger.info("Done.")
     
 
 
@@ -368,7 +369,7 @@ def load_celltype_data(directory, dashboard_id, host, port, chunksize=None, meta
     # if num_records != total_records:
     #     raise ValueError(f'mismatch in {num_records} loaded to {total_records} total records')
 
-    load_dashboard_entry(directory, dashboard_id, metadata, host, port)
+    load_dashboard_entry(directory, "cohort", dashboard_id, metadata, host, port)
 
 
 # load_analysis('~/data/003/', "003", 'plvicosspecdat2', 9200)

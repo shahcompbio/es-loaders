@@ -23,6 +23,15 @@ SAMPLE_RANGE_NAME = 'sample_metadata'
 SORT_ENCODER = {'singlet, live, CD45+': 'CD45P',
                 'singlet, live, CD45-': 'CD45N', 'singlet, live, U': 'U'}
 
+
+def download_metadata(analyses, base_directory):
+    metadata = get_metadata()
+    for analysis in analyses:
+        directory = os.path.join(base_directory, analysis["dashboard_id"])
+
+        generate_metadata_json(analysis, metadata, directory)
+        print(f'Done download for {analysis["dashboard_id"]}')
+
 def download_analyses_data(type, analyses, base_directory):
 
     metadata = get_metadata()
@@ -98,7 +107,12 @@ def generate_metadata_json(analysis, metadata, directory):
     samples = [sample[0] for sample in samples]
 
     sample_data = [metadata[sample_id] for sample_id in samples]
-    processed_metadata = [_transform_metadata(sample, analysis["patient_id"]) for sample in sample_data]
+    processed_metadata = [_transform_metadata(sample, analysis["dashboard_id"]) for sample in sample_data]
+
+    metadata_path = os.path.join(directory, constants.SAMPLES_FILENAME)
+
+    if os.path.exists(metadata_path):
+        os.remove(metadata_path)
 
     with open(os.path.join(directory, constants.SAMPLES_FILENAME), 'w+') as outfile:
         json.dump(processed_metadata, outfile)
@@ -106,6 +120,7 @@ def generate_metadata_json(analysis, metadata, directory):
 def _transform_metadata(sample, dashboard_id):
     return {
         "sample_id": sample["isabl_id"],
+        "patient_id": sample["patient_id"],
         "dashboard_id": dashboard_id,
         "site": sample["tumor_subsite"],
         "tumor_type": sample["tumor_type"],
