@@ -3,10 +3,10 @@ import logging
 import logging.handlers
 import os
 
-from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data
+from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data, load_dashboard_entry as _load_dashboard_entry
 from mira.mira_isabl import get_new_isabl_analyses
-from mira.mira_data import download_analyses_data, get_celltype_analyses, download_cohort_data
-from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho
+from mira.mira_data import download_analyses_data, get_celltype_analyses, download_cohort_data, download_metadata
+from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry
 from mira.rho_loader import download_rho_data
 
 
@@ -56,9 +56,9 @@ def load_analysis(ctx, data_directory, id, type, reload, chunksize, download, lo
     es_port = ctx.obj["port"]
 
     if load_new:
-        analyses_metadata = get_new_isabl_analyses(load_new=True, es_host=es_host, es_port=es_port)
+        analyses_metadata = get_new_isabl_analyses(type, load_new=True, es_host=es_host, es_port=es_port)
     else:
-        analyses_metadata = get_new_isabl_analyses(dashboard_id=id, es_host=es_host, es_port=es_port)
+        analyses_metadata = get_new_isabl_analyses(type, dashboard_id=id, es_host=es_host, es_port=es_port)
     analyses = [{**analysis, "directory": data_directory if data_directory.endswith(analysis["dashboard_id"]) else os.path.join(data_directory, analysis["dashboard_id"]) } for analysis in analyses_metadata]
 
     if download:
@@ -72,7 +72,7 @@ def load_analysis(ctx, data_directory, id, type, reload, chunksize, download, lo
         if reload:
             _clean_analysis(analysis["dashboard_id"], host=es_host, port=es_port)
 
-        _load_analysis(analysis["directory"], analysis["dashboard_id"], es_host, es_port, chunksize=chunksize * int(1e6), metadata=metadata)
+        _load_analysis(analysis["directory"], type, analysis["dashboard_id"], es_host, es_port, chunksize=chunksize * int(1e6), metadata=metadata)
 
 
 @main.command()
@@ -121,6 +121,89 @@ def load_rho(ctx, github_token, reload):
     _load_rho(data, host=host, port=port)
 
 
+@main.command()
+@click.argument('data_directory')
+@click.pass_context
+@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
+@click.option('--id', help="ID of dashboard")
+@click.option('--reload', is_flag=True, help="Force reload this library")
+def generate_sample_metadata(ctx, data_directory, type, id, reload):
+
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    analyses_metadata = get_new_isabl_analyses(type, es_host=es_host, es_port=es_port)
+
+    download_metadata(analyses_metadata, data_directory)
+
+@main.command()
+@click.argument('data_directory')
+@click.pass_context
+@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
+@click.option('--id', help="ID of dashboard")
+@click.option('--reload', is_flag=True, help="Force reload this library")
+def generate_sample_metadata_cohort(ctx, data_directory, type, id, reload):
+
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    analyses_metadata = get_new_isabl_analyses(type, es_host=es_host, es_port=es_port)
+
+    download_metadata(analyses_metadata, data_directory)
+
+
+@main.command()
+@click.argument('data_directory')
+@click.pass_context
+@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
+@click.option('--id', help="ID of dashboard")
+@click.option('--reload', is_flag=True, help="Force reload this library")
+def load_dashboard_entry(ctx, data_directory, type, id, reload):
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    analyses_metadata = get_new_isabl_analyses(type, es_host=es_host, es_port=es_port)
+
+    analyses = [{**analysis, "directory": data_directory if data_directory.endswith(analysis["dashboard_id"]) or type == "cohort" else os.path.join(data_directory, analysis["dashboard_id"]) } for analysis in analyses_metadata]
+
+
+    for analysis in analyses:
+        metadata = {
+            "date": analysis["modified"]
+        }
+
+        if reload:
+            clean_dashboard_entry(analysis["dashboard_id"], es_host, es_port)
+
+        _load_dashboard_entry(analysis["directory"], type, analysis["dashboard_id"], metadata, es_host, es_port)
+    
+
+
+@main.command()
+@click.argument('data_directory')
+@click.pass_context
+@click.option('--id', help="ID of dashboard")
+@click.option('--reload', is_flag=True, help="Force reload this library")
+@click.option('--download', is_flag=True, help="Download files")
+def load_dashboard_entry_cohort(ctx, data_directory, id, reload, download):
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    cohort_analysis = get_new_isabl_analyses("cohort", es_host=es_host, es_port=es_port)
+    cohort_celltype_analyses = get_celltype_analyses(cohort_analysis)
+
+    if download:
+        download_cohort_data(cohort_analysis, cohort_celltype_analyses, data_directory)
+
+    metadata = {
+        "date": cohort_analysis["modified"]
+    }
+
+    for analysis in cohort_celltype_analyses:
+        if reload:
+            clean_dashboard_entry(analysis["dashboard_id"], es_host, es_port)
+
+        _load_dashboard_entry(data_directory, "cohort", analysis["dashboard_id"], metadata, es_host, es_port)
 
 @main.command()
 @click.argument('dashboard_id')

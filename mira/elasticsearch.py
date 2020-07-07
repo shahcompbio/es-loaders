@@ -100,6 +100,12 @@ def clean_analysis(dashboard_id, host, port):
     delete_records(constants.DASHBOARD_ENTRY_INDEX, 
                    dashboard_id, host=host, port=port)
 
+def clean_dashboard_entry(dashboard_id, host, port):
+    logger.info("DELETE DASHBOARD_ENTRY")
+    delete_records(constants.DASHBOARD_ENTRY_INDEX, 
+                   dashboard_id, host=host, port=port)
+
+
 def clean_rho(host, port):
     logger.info("====================== CLEANING RHO")
 
