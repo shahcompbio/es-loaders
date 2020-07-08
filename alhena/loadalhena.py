@@ -141,7 +141,6 @@ def get_gc_bias_data(hmmcopy_data):
         new_df.columns = ['cell_id', 'value']
         new_df['gc_percent'] = n
         gc_bias_df = gc_bias_df.append(new_df, ignore_index=True)
-
     # data = data.merge(hmmcopy_data['annotation_metrics'][[
     #                   'cell_id', 'experimental_condition']], on='cell_id', how='left')
 
@@ -175,9 +174,9 @@ def get_gc_bias_data(hmmcopy_data):
 @click.argument('ip_address')
 @click.option('--local_cache_directory')
 @click.option('--ticket_directory', multiple=True)
-@click.option('--description', default='test description')
-@click.option('--title', default='test title')
+@click.option('--description', default=None)
 @click.option('--sample_id', default=None)
+@click.option('--library_id', default=None)
 @click.option('--cell_subset_count', default=None, type=int)
 @click.option('--cell_ids', '-c', multiple=True)
 @click.option('--experimental_condition_override')
@@ -187,8 +186,8 @@ def load_ticket(
     local_cache_directory=None,
     ticket_directory=None,
     description=None,
-    title=None,
     sample_id=None,
+    library_id=None,
     cell_subset_count=None,
     cell_ids=None,
     experimental_condition_override=None,
@@ -227,9 +226,9 @@ def load_ticket(
 
     logging.info(f'loading hmmcopy data with tables {hmmcopy_data.keys()}')
 
-    if sample_id is not None:
-        logging.info(f'filtering hmmcopy data by sample={sample_id}')
-        filter_by_sample_id(hmmcopy_data, sample_id)
+    # if sample_id is not None:
+    #     logging.info(f'filtering hmmcopy data by sample={sample_id}')
+    #     filter_by_sample_id(hmmcopy_data, sample_id)
 
     elasticsearch_client = ElasticsearchClient(host=ip_address)
 
@@ -258,15 +257,27 @@ def load_ticket(
 
         logging.info(f"dataframe for {index_name} has shape {data.shape}")
 
-        data['caller'] = caller_map[index_type]
-        data['sample_id'] = jira_ticket
-
         load_index(elasticsearch_client, index_name, data,)
 
     logging.info(
         f"loading published dashboard record {jira_ticket}")
 
-    AnalysisLoader().load_data(jira_ticket, ip_address, 9200)
+    if description is not None:
+        # Assuming not colossus so need to check that all the other fields are there
+        assert sample_id is not None, "Must specify sample_id"
+        assert library_id is not None, "Must specify library_id"
+
+        analysis_record = {
+            "sample_id": sample_id,
+            "library_id": library_id,
+            "jira_id": jira_ticket,
+            "description": description
+        }
+        elasticsearch_client.load_record(
+            analysis_record, "analyses", jira_ticket)
+
+    else:
+        AnalysisLoader().load_data(jira_ticket, ip_address, 9200)
 
 # elasticsearch_client.load_published_dashboard_record(
 #     jira_ticket, title=title, description=description)

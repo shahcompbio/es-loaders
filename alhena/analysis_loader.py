@@ -17,12 +17,12 @@ class AnalysisLoader():
         analysis_record = colossus.get_analysis_information(
             jira_id)
 
-        record = self._get_record(analysis_record)
+        record = self._get_record(analysis_record, jira_id)
 
         es = ElasticsearchClient(host=host, port=port)
         es.load_record(record, self.__INDEX_NAME__, jira_id)
 
-    def _get_record(self, analysis, index=0):
+    def _get_record(self, analysis, jira_id, index=0):
         parsed_sample_id = analysis["library"]["sample"]["sample_id"].split(
             "X")
 
@@ -31,7 +31,7 @@ class AnalysisLoader():
                 "sample_id": parsed_sample_id[0],
                 "timepoint": int(parsed_sample_id[1]),
                 "library_id": analysis["library"]["pool_id"],
-                "jira_id": analysis["library"]["jira_ticket"],
+                "jira_id": jira_id,
                 "description": analysis["library"]["description"]
             }
             return record
@@ -40,14 +40,14 @@ class AnalysisLoader():
             return {
                 "sample_id": parsed_sample_id[0],
                 "library_id": analysis["library"]["pool_id"],
-                "jira_id": analysis["library"]["jira_ticket"],
+                "jira_id": jira_id,
                 "description": analysis["library"]["description"]
             }
         except IndexError:
             return {
                 "sample_id": parsed_sample_id[0],
                 "library_id": analysis["library"]["pool_id"],
-                "jira_id": analysis["library"]["jira_ticket"],
+                "jira_id": jira_id,
                 "description": analysis["library"]["description"]
             }
 
