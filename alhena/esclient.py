@@ -1,8 +1,10 @@
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
-
 import types
+import os
 
+import urllib3
+urllib3.disable_warnings()
 
 settings = {
     'settings': {
@@ -40,7 +42,8 @@ default_mapping = {
 class ElasticsearchClient():
 
     def __init__(self, host='localhost', port=9200):
-        es = Elasticsearch(hosts=[{'host': host, 'port': port}], timeout=300)
+        assert os.environ['ALHENA_ES_USER'] is not None and os.environ['ALHENA_ES_PASSWORD'] is not None, 'Elasticsearch credentials missing'
+        es = Elasticsearch(hosts=[{'host': host, 'port': port}], http_auth=(os.environ['ALHENA_ES_USER'], os.environ['ALHENA_ES_PASSWORD']),scheme='https',timeout=300, verify_certs=False)
         self.es = es
 
     def create_index(self, index):
