@@ -6,8 +6,9 @@ import os
 from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data, load_dashboard_entry as _load_dashboard_entry
 from mira.mira_isabl import get_new_isabl_analyses
 from mira.mira_data import download_analyses_data, get_celltype_analyses, download_cohort_data, download_metadata
-from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry
-from mira.rho_loader import download_rho_data
+from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry, clean_genes as _clean_genes
+from mira.rho_loader import download_rho_data, generate_dashboard_rho
+from mira.gene_loader import load_gene_names as _load_genes
 
 
 from elasticsearch import Elasticsearch
@@ -108,17 +109,31 @@ def load_cohort(ctx, data_directory, reload, chunksize, download):
         load_celltype_data(data_directory, analysis["dashboard_id"], es_host, es_port, chunksize=chunksize * int(1e6), metadata=metadata)
 
 @main.command()
-@click.argument('github_token')
+@click.argument('dashboard_id')
 @click.option('--reload', is_flag=True, help="Force reload")
 @click.pass_context
-def load_rho(ctx, github_token, reload):
+def load_rho(ctx, dashboard_id, reload):
     host = ctx.obj['host']
     port = ctx.obj['port']
     if reload:
         _clean_rho(host, port)
 
-    data = download_rho_data(github_token)
+    data = download_rho_data()
+    data = generate_dashboard_rho(data, dashboard_id)
     _load_rho(data, host=host, port=port)
+
+
+@main.command()
+@click.argument('directory')
+@click.option('--reload', is_flag=True, help="Force reload")
+@click.pass_context
+def load_genes(ctx, directory, reload):
+    host = ctx.obj['host']
+    port = ctx.obj['port']
+    if reload:
+        _clean_genes(host, port)
+
+    _load_genes(directory, host=host, port=port)
 
 
 @main.command()

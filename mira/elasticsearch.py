@@ -46,6 +46,30 @@ def is_dashboard_loaded(dashboard_id, date, host, port):
     return result["hits"]["total"]["value"] > 0 
 
 
+def query_cell_type_count(dashboard_id, cell_type, host, port):
+    es = initialize_es(host, port)
+    index = constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower()
+
+    assert es.indices.exists(index)
+
+    query = {
+        "query": {
+            "bool": {
+            "filter": {
+                "term": {
+                "cell_type": cell_type
+                }
+            }
+            }
+        }
+    }
+
+    count = es.count(body=query, index=index)
+
+    return count["count"]
+
+
+
 def load_cells(records, dashboard_id, host, port):
     load_records(records, constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower(),constants.CELLS_INDEX_MAPPING, host, port)
 
@@ -55,6 +79,9 @@ def load_dashboard_entry(record, dashboard_id, host, port):
 
 def load_rho(records, host, port):
     load_records(records, constants.MARKER_GENES_INDEX, constants.MARKER_GENES_MAPPING, host, port)
+
+def load_genes(records, host, port):
+    load_records(records, constants.GENES_INDEX, constants.GENES_MAPPING, host, port)
 
 
 def load_records(records, index_name, mapping, host, port):
@@ -106,12 +133,18 @@ def clean_dashboard_entry(dashboard_id, host, port):
                    dashboard_id, host=host, port=port)
 
 
-def clean_rho(host, port):
+def clean_genes(host, port):
+    logger.info("====================== CLEANING GENES")
+
+    logger.info("DELETE GENE LIST")
+    delete_index(constants.GENES_INDEX, host=host, port=port)
+
+
+def clean_rho(dashboard_id, host, port):
     logger.info("====================== CLEANING RHO")
 
-    logger.info("DELETE DATA")
-    delete_index(constants.MARKER_GENES_INDEX, host=host, port=port)
-
+    logger.info("DELETE RHO")
+    delete_records(constants.MARKER_GENES_INDEX, dashboard_id, host=host, port=port)
 
 
 def delete_index(index, host="localhost", port=9200):

@@ -2,15 +2,27 @@
 import os
 import pandas as pd
 import numpy as np
+import requests
+import io
 import mira.constants as constants
 
 import logging
 logger = logging.getLogger("mira_loading")
 
 
-def download_rho_data(token):
+def generate_dashboard_rho(cell_types, dashboard_id):
+    return [{**cell_type, "dashboard_id": dashboard_id} for cell_type in cell_types]
+
+
+def download_rho_data():
     logger.info("======================= Downloading marker genes")
-    marker_genes = pd.read_csv(constants.MARKER_GENES_URL+ "?token=" + token)
+
+    git_session = requests.Session()
+    git_session.auth = (os.environ["GITHUB_USER"], os.environ["GITHUB_ACCESS_TOKEN"])
+    
+    download = git_session.get(constants.MARKER_GENES_URL).content
+
+    marker_genes = pd.read_csv(io.StringIO(download.decode('utf-8')))
     marker_genes = marker_genes.transpose()
 
     gene_list = marker_genes[:'Unnamed: 0'].values.tolist()[0]
@@ -22,12 +34,15 @@ def download_rho_data(token):
     marker_genes['cell_type'] = marker_genes['cell_type'].str.replace('.', ' ')
     cell_types = marker_genes['cell_type'].values
 
-    rows, cols = np.where(marker_genes.values == 1)
-    marker_gene_list = list(zip(marker_genes.index[rows], marker_genes.columns[cols]))
+    data = []
+    for i in range(len(cell_types)):
+        row, cols = np.where(marker_genes[i:i+1].values == 1)
 
-    
-    logger.info(f'{len(cell_types)} cell types with total {len(marker_gene_list)} marker genes')
+        record = {
+            "cell_type": cell_types[i],
+            "genes": list(marker_genes.columns[cols])
+        }
 
-    data = [{"cell_type": cell_types[marker_pair[0]], "gene": marker_pair[1]} for marker_pair in marker_gene_list]
+        data.append(record)
 
     return data

@@ -12,9 +12,31 @@ MARKER_GENES_URL = "https://raw.githubusercontent.com/shahcompbio/shahlab_apps/m
 DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 DASHBOARD_DATA_PREFIX = "dashboard_cells_"
 MARKER_GENES_INDEX = "marker_genes"
+GENES_INDEX = "genes"
 
 ## Elasticsearch mappings
 MARKER_GENES_MAPPING = {
+    "settings": {
+        "index": {
+            "max_result_window": 50000
+        }
+    },
+    'mappings': {
+        "dynamic_templates": [
+            {
+                "string_values": {
+                    "match": "*",
+                    "match_mapping_type": "string",
+                    "mapping": {
+                        "type": "keyword"
+                    }
+                }
+            }
+        ]
+    }
+}
+
+GENES_MAPPING = {
     "settings": {
         "index": {
             "max_result_window": 50000
