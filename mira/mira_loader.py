@@ -3,8 +3,9 @@ import logging
 import os
 import pandas as pd
 
-from mira.elasticsearch import load_cells, load_dashboard_entry as _load_dashboard_entry
+from mira.elasticsearch import load_cells, load_dashboard_entry as _load_dashboard_entry, load_rho as _load_rho
 import mira.constants as constants
+from mira.rho_loader import download_rho_data, generate_dashboard_rho
 
 
 logger = logging.getLogger('mira_loading')
@@ -17,6 +18,7 @@ def load_analysis(directory, type, dashboard_id, host, port, isCohort=False, chu
     logger.info("====================== " + dashboard_id)
     load_data(directory, dashboard_id, host, port,isCohort=isCohort, chunksize=chunksize, metadata=metadata)
 
+    load_rho(dashboard_id, host, port)
     load_dashboard_entry(directory, type,dashboard_id, metadata, host, port)
 
 
@@ -24,6 +26,10 @@ def load_analysis(directory, type, dashboard_id, host, port, isCohort=False, chu
     
 
 
+def load_rho(dashboard_id, host, port):
+    data = download_rho_data()
+    data = generate_dashboard_rho(data, dashboard_id)
+    _load_rho(data, host=host, port=port)
 
 
 ## Loading metadata for Mira

@@ -12,6 +12,30 @@ def initialize_es(host, port):
     return es
 
 
+def get_cell_type_count(cell_type, dashboard_id, host, port):
+    es = initialize_es(host, port)
+
+    index = constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower()
+    
+    if not es.indices.exists(index):
+        return 0
+
+    result = es.count(index=index, body={
+        "query": {
+            "bool": {
+                "filter": {
+                    "term": {
+                        "cell_type": cell_type
+                    }
+                }
+            }
+        }
+    })
+
+    return result["count"]
+
+    
+
 def is_dashboard_loaded(dashboard_id, date, host, port):
     es = initialize_es(host, port)
 
@@ -122,6 +146,9 @@ def clean_analysis(dashboard_id, host, port):
 
     logger.info("DELETE DATA")
     delete_index(constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower(), host=host, port=port)
+
+    logger.info("DELETE RHO DATA")
+    clean_rho(dashboard_id, host, port)
 
     logger.info("DELETE DASHBOARD_ENTRY")
     delete_records(constants.DASHBOARD_ENTRY_INDEX, 

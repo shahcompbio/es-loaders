@@ -119,7 +119,7 @@ def load_rho(ctx, dashboard_id, reload):
         _clean_rho(host, port)
 
     data = download_rho_data()
-    data = generate_dashboard_rho(data, dashboard_id)
+    data = generate_dashboard_rho(data, dashboard_id, host=host, port=port)
     _load_rho(data, host=host, port=port)
 
 

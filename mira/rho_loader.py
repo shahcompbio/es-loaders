@@ -5,13 +5,27 @@ import numpy as np
 import requests
 import io
 import mira.constants as constants
+from mira.elasticsearch import get_cell_type_count
 
 import logging
 logger = logging.getLogger("mira_loading")
 
 
-def generate_dashboard_rho(cell_types, dashboard_id):
-    return [{**cell_type, "dashboard_id": dashboard_id} for cell_type in cell_types]
+def generate_dashboard_rho(cell_types, dashboard_id, host, port):
+    ## Assumes that cell data is already loaded
+    records = []
+
+    for cell_type_record in cell_types:
+        count = get_cell_type_count(cell_type_record["cell_type"], dashboard_id, host, port)
+
+        records.append({
+            **cell_type_record,
+            "dashboard_id": dashboard_id,
+            "count": count
+        })        
+
+
+    return records
 
 
 def download_rho_data():
