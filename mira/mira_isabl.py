@@ -36,12 +36,16 @@ def get_isabl_scrna_analyses(type):
     all_analyses = ii.get_instances('analyses', application__name__in='CELLASSIGN Individual Application, CELLASSIGN Project Application')
 
     if type == "cohort":
-        ## We will make the naive assumption that there will only ever be one cohort analysis entry in Isabl for the entire project (LOL)
-        cohort_analysis = [analysis for analysis in all_analyses if is_cohort_analysis(analysis)][0]
+        cohort_analyses = [analysis for analysis in all_analyses if is_cohort_analysis(analysis)]
 
-        return generate_cohort_analyses(cohort_analysis)
+        cohort_analyses = [{
+            **_process_analysis(analysis),
+            "dashboard_id": "cohort_all"
+        } for analysis in cohort_analyses]
 
-    else:
+        return cohort_analyses
+
+    else: # is patient
         analyses = [{**_process_analysis(analysis), "dashboard_id": analysis["individual_level_analysis"]["identifier"]} for analysis in all_analyses if is_patient_analysis(analysis)]
 
     return analyses
@@ -54,7 +58,6 @@ def _process_analysis(analysis):
         "juno_storage": analysis["storage_url"]
     }
 
-
 def is_patient_analysis(analysis):
     return analysis['application']['name'] == 'CELLASSIGN Individual Application' \
          and analysis['application']['version'] == APP_VERSION \
@@ -64,11 +67,7 @@ def is_cohort_analysis(analysis):
     return analysis['application']['name'] == 'CELLASSIGN Project Application' \
          and analysis['status'] == 'SUCCEEDED'  
 
-def generate_cohort_analyses(analysis):
-    return {
-        **_process_analysis(analysis),
-        "dashboard_id": "cohort_all"
-    }
+
 
 
 

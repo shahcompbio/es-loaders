@@ -5,16 +5,19 @@ import logging
 import os
 import sys
 import json
-
-
-import mira.constants as constants
+import requests
+import io
 import pickle
 import collections
 import pandas as pd
+import numpy as np
+
+import mira.constants as constants
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
+logger = logging.getLogger('mira_loading')
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 SAMPLE_SPREADSHEET_ID = '1plhIL1rH2IuQ8b_komjAUHKKrnYPNDyhvNNRsTv74u8'
@@ -32,7 +35,8 @@ def download_metadata(analyses, base_directory):
         generate_metadata_json(analysis, metadata, directory)
         print(f'Done download for {analysis["dashboard_id"]}')
 
-def download_analyses_data(type, analyses, base_directory):
+
+def download_analyses_data(type, analyses, base_directory, cohort_group=None):
 
     metadata = get_metadata()
 
@@ -42,19 +46,84 @@ def download_analyses_data(type, analyses, base_directory):
 
     with SCPClient(ssh.get_transport(), progress=progress) as scp:
 
-        for analysis in analyses:
-            directory = os.path.join(base_directory, analysis["patient_id"])
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-
-            scp.get(os.path.join(analysis["juno_storage"], constants.CELLS_FILENAME), directory)
-            scp.get(os.path.join(analysis["juno_storage"], constants.GENES_FILENAME), directory)
-            scp.get(os.path.join(analysis["juno_storage"], constants.MATRIX_FILENAME), directory)
-            scp.get(os.path.join(analysis["juno_storage"], constants.JUNO_SAMPLES_FILENAME), directory)
+        if type == "patient":
+            for analysis in analyses:
+                directory = os.path.join(base_directory, analysis["dashboard_id"])
+                logger.info(f'Starting download for {analysis["dashboard_id"]}')
+                if not os.path.exists(directory):
+                    logger.info(f'Creating directory: {directory}')
+                    os.makedirs(directory)
 
 
-            generate_metadata_json(analysis, metadata, directory)
-            print(f'Done download for {analysis["patient_id"]}')
+                logger.info(f'{analysis["dashboard_id"]}: Downloading cells')
+                scp.get(os.path.join(analysis["juno_storage"], constants.CELLS_FILENAME), directory)
+                logger.info(f'{analysis["dashboard_id"]}: Downloading genes')
+                scp.get(os.path.join(analysis["juno_storage"], constants.GENES_FILENAME), directory)
+                logger.info(f'{analysis["dashboard_id"]}: Downloading matrix')
+                scp.get(os.path.join(analysis["juno_storage"], constants.MATRIX_FILENAME), directory)
+                logger.info(f'{analysis["dashboard_id"]}: Downloading samples')
+                scp.get(os.path.join(analysis["juno_storage"], constants.JUNO_SAMPLES_FILENAME), directory)
+
+                generate_metadata_json(analysis, metadata, directory)
+                generate_marker_genes(analysis, directory)
+                logger.info(f'Done download for {analysis["dashboard_id"]}')
+
+        elif type == "cohort":
+            if cohort_group == "cohort":
+                cohort_analysis = analyses[0]
+                subset_analyses = []
+            elif cohort_group == "cell_type":
+                cohort_analysis = None
+                subset_analyses = analyses
+            elif cohort_group == "both":
+                cohort_analysis = analyses[0]
+                subset_analyses = analyses[1:]
+            
+            if cohort_analysis is not None:
+                directory = os.path.join(base_directory, analysis["dashboard_id"])
+                logger.info(f'Starting download for {analysis["dashboard_id"]}')
+                if not os.path.exists(directory):
+                    logger.info(f'Creating directory: {directory}')
+                    os.makedirs(directory)
+
+                ## download main cohort file
+                logger.info(f'{analysis["dashboard_id"]}: Downloading cells')
+                scp.get(os.path.join(cohort_analysis["juno_storage"], constants.CELLS_FILENAME), directory)
+                logger.info(f'{analysis["dashboard_id"]}: Downloading genes')
+                scp.get(os.path.join(cohort_analysis["juno_storage"], constants.GENES_FILENAME), directory)
+                logger.info(f'{analysis["dashboard_id"]}: Downloading matrix')
+                scp.get(os.path.join(cohort_analysis["juno_storage"], constants.MATRIX_FILENAME), directory)
+
+                generate_cohort_metadata_json(analysis, metadata, directory)
+                generate_marker_genes(analysis, directory)
+                logger.info(f'Done download for {analysis["dashboard_id"]}')
+
+            if len(subset_analyses) > 0:
+                ## assume that cohort data is already downloaded
+                cohort_directory = os.path.join(base_directory, "cohort_all")
+                 
+                for analysis in subset_analyses:
+                    directory = os.path.join(base_directory, analysis["dashboard_id"])
+                    logger.info(f'Starting download for {analysis["dashboard_id"]}')
+                    if not os.path.exists(directory):
+                        logger.info(f'Creating directory: {directory}')
+                        os.makedirs(directory)
+                    ## transfer the cell type file over and rename it appropriately
+                    ## sym link to the large cohort genes and matrix file
+                    logger.info(f'{analysis["dashboard_id"]}: Downloading cells')
+                    scp.get(analysis["juno_storage"], os.path.join(directory, constants.CELLS_FILENAME))
+
+                    logger.info(f'{analysis["dashboard_id"]}: Linking genes')
+                    os.symlink(os.path.join(cohort_directory, constants.GENES_FILENAME), os.path.join(directory, constants.GENES_FILENAME))
+                    logger.info(f'{analysis["dashboard_id"]}: Linking matrix')
+                    os.symlink(os.path.join(cohort_directory, constants.MATRIX_FILENAME), os.path.join(directory, constants.MATRIX_FILENAME))
+
+                    generate_cohort_metadata_json(analysis, metadata, directory)
+                    generate_marker_genes(analysis, directory)
+                    logger.info(f'Done download for {analysis["dashboard_id"]}')
+
+            
+
 
 def progress(filename, size, sent):
     sys.stdout.write("%s\'s progress: %.2f%%   \r" % (filename, float(sent)/float(size)*100) )
@@ -112,8 +181,24 @@ def generate_metadata_json(analysis, metadata, directory):
     metadata_path = os.path.join(directory, constants.SAMPLES_FILENAME)
 
     if os.path.exists(metadata_path):
+        logger.info("Refreshing metadata")
         os.remove(metadata_path)
 
+    logger.info(f'{analysis["dashboard_id"]}: Create metadata with {len(processed_metadata)} samples')
+    with open(os.path.join(directory, constants.SAMPLES_FILENAME), 'w+') as outfile:
+        json.dump(processed_metadata, outfile)
+
+
+def generate_cohort_metadata_json(analysis, metadata, directory):
+    processed_metadata = [_transform_metadata(metadata[sample_id], analysis["dashboard_id"]) for sample_id in dict(metadata)]
+    
+    metadata_path = os.path.join(directory, constants.SAMPLES_FILENAME)
+
+    if os.path.exists(metadata_path):
+        logger.info("Refreshing metadata")
+        os.remove(metadata_path)
+
+    logger.info(f'{analysis["dashboard_id"]}: Create metadata with {len(processed_metadata)} samples')
     with open(os.path.join(directory, constants.SAMPLES_FILENAME), 'w+') as outfile:
         json.dump(processed_metadata, outfile)
 
@@ -130,27 +215,39 @@ def _transform_metadata(sample, dashboard_id):
     }
 
 
-def download_cohort_data(cohort_analysis, cohort_celltype_analyses, directory):
-    ssh = SSHClient()
-    ssh.load_system_host_keys()
-    ssh.connect('juno')
+def generate_marker_genes(analysis, directory):
+    git_session = requests.Session()
+    git_session.auth = (os.environ["GITHUB_USER"], os.environ["GITHUB_ACCESS_TOKEN"])
 
-    with SCPClient(ssh.get_transport(), progress=progress) as scp:
-        # scp.get(os.path.join(cohort_analysis["juno_storage"], constants.CELLS_FILENAME), directory)
-        # scp.get(os.path.join(cohort_analysis["juno_storage"], constants.GENES_FILENAME), directory)
-        # scp.get(os.path.join(cohort_analysis["juno_storage"], constants.MATRIX_FILENAME), directory)
+    download = git_session.get(constants.MARKER_GENES_URL).content
 
-        for analysis in cohort_celltype_analyses:
-            scp.get(analysis["juno_storage"], os.path.join(directory, analysis["dashboard_id"]+"_cells.tsv"))
+    marker_genes = pd.read_csv(io.StringIO(download.decode('utf-8')))
+    marker_genes = marker_genes.transpose()
 
-            print(f'Done download for {analysis["dashboard_id"]}')
+    gene_list = marker_genes[:'Unnamed: 0'].values.tolist()[0]
+    marker_genes.columns = gene_list
+    marker_genes = marker_genes.iloc[1:]
 
+    marker_genes.index.name = 'cell_type'
+    marker_genes = marker_genes.reset_index(drop=False)
+    marker_genes['cell_type'] = marker_genes['cell_type'].str.replace('.', ' ')
+    cell_types = marker_genes['cell_type'].values
 
-    metadata = get_metadata()
-    sample_list = [_transform_metadata(metadata[sample_id], cohort_analysis["dashboard_id"]) for sample_id in dict(metadata)]
+    data = []
+    for i in range(len(cell_types)):
+        row, cols = np.where(marker_genes[i:i+1].values == 1)
 
-    with open(os.path.join(directory, constants.SAMPLES_FILENAME), 'w+') as outfile:
-        json.dump(sample_list, outfile)
+        record = {
+            "cell_type": cell_types[i],
+            "genes": list(marker_genes.columns[cols])
+        }
+
+        data.append(record)
+
+    logger.info(f'{analysis["dashboard_id"]}: Create marker gene files with {len(data)} cells')
+    with open(os.path.join(directory, constants.MARKER_GENES_FILENAME), 'w+') as outfile:
+        json.dump(data, outfile)
+
 
 
 def get_celltype_analyses(cohort_analysis):

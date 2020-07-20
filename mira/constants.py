@@ -5,6 +5,7 @@ GENES_FILENAME = 'genes.tsv'
 MATRIX_FILENAME = 'matrix.mtx'
 JUNO_SAMPLES_FILENAME = 'samples.txt'
 SAMPLES_FILENAME = 'sample_metadata.json'
+MARKER_GENES_FILENAME = 'marker_genes.json'
 
 MARKER_GENES_URL = "https://raw.githubusercontent.com/shahcompbio/shahlab_apps/master/shahlab_apps/apps/cellassign/hgsc_v5_major.csv"
 

@@ -2,10 +2,10 @@
 import logging
 import os
 import pandas as pd
+import json
 
-from mira.elasticsearch import load_cells, load_dashboard_entry as _load_dashboard_entry, load_rho as _load_rho
+from mira.elasticsearch import load_cells, load_dashboard_entry as _load_dashboard_entry, load_rho as _load_rho, get_cell_type_count
 import mira.constants as constants
-from mira.rho_loader import download_rho_data, generate_dashboard_rho
 
 
 logger = logging.getLogger('mira_loading')
@@ -13,27 +13,53 @@ logger = logging.getLogger('mira_loading')
 
 
 
-## main method. Will load both data and metadata records needed for Mira
-def load_analysis(directory, type, dashboard_id, host, port, isCohort=False, chunksize=None, metadata={}):
+## main method. 
+## Will load both data, metadata, and marker gene records needed for Mira   
+## ASSUMES THAT DIRECTORY IS WHERE THE FILES ARE KEPT
+## ASSUMES the following files:
+##   - genes.tsv
+##   - cells.tsv
+##   - matrix.mtx
+##   - sample_metadata.json
+##   - marker_genes.json
+def load_analysis(directory, type, dashboard_id, host, port, chunksize=None, metadata={}):
     logger.info("====================== " + dashboard_id)
-    load_data(directory, dashboard_id, host, port,isCohort=isCohort, chunksize=chunksize, metadata=metadata)
 
-    load_rho(dashboard_id, host, port)
+    load_data(directory, dashboard_id, host, port, chunksize=chunksize, metadata=metadata)
+    load_rho(directory, dashboard_id, host, port)
     load_dashboard_entry(directory, type,dashboard_id, metadata, host, port)
-
 
     logger.info("Done.")
     
 
 
-def load_rho(dashboard_id, host, port):
-    data = download_rho_data()
-    data = generate_dashboard_rho(data, dashboard_id)
-    _load_rho(data, host=host, port=port)
+def load_rho(directory, dashboard_id, host, port):
+    logger.info("LOADING MARKER GENES: " + dashboard_id)
+
+    logger.debug("Opening files")
+    markers_filename = os.path.join(directory, constants.MARKER_GENES_FILENAME)
+
+    with open(markers_filename) as markers_file:
+        cell_types = json.load(markers_file)
+
+
+    logger.debug("Processing files")
+    records = []
+
+    for cell_type_record in cell_types:
+        count = get_cell_type_count(cell_type_record["cell_type"], dashboard_id, host, port)
+
+        records.append({
+            **cell_type_record,
+            "dashboard_id": dashboard_id,
+            "count": count
+        })        
+
+    _load_rho(records, host=host, port=port)
+    logger.info("LOADED MARKER GENES")
 
 
 ## Loading metadata for Mira
-## Assumes samples_metadata.json file exists
 def load_dashboard_entry(directory, type, dashboard_id, dashboard_metadata, host, port):
 
     logger.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
@@ -55,17 +81,12 @@ def load_dashboard_entry(directory, type, dashboard_id, dashboard_metadata, host
     logger.info("LOADED DASHBOARD ENTRY")
 
 
-def load_data(directory, dashboard_id, host, port, isCohort=False, chunksize=None, metadata={}):
+def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
     logger.info("LOADING DATA: " + dashboard_id)
 
     logger.debug("Opening files")
-    if isCohort:
-        if dashboard_id == "cohort_all":
-            cells_filename = os.path.join(directory, constants.CELLS_FILENAME)
-        else:
-            cells_filename = os.path.join(directory, dashboard_id + "_cells.tsv")
-    else:
-        cells_filename = os.path.join(directory, constants.CELLS_FILENAME)
+
+    cells_filename = os.path.join(directory, constants.CELLS_FILENAME)
     genes_filename = os.path.join(directory, constants.GENES_FILENAME)
     matrix_filename = os.path.join(directory, constants.MATRIX_FILENAME)
     metadata_filename = os.path.join(directory, constants.SAMPLES_FILENAME)
@@ -73,9 +94,11 @@ def load_data(directory, dashboard_id, host, port, isCohort=False, chunksize=Non
     logger.info("Opening Files at: " + directory)
     logger.info("Opening cell file")
     cells = pd.read_csv(cells_filename, sep='\t')
-    if not isCohort:
+
+    if 'cell_id' not in cells.columns:
         cells.index.name = 'cell_id'
         cells = cells.reset_index(drop=False)
+
     cells.index.name = 'cell_idx'
     cells = cells.reset_index(drop=False)
     cells['cell_type'] = cells['cell_type'].str.replace('.', ' ')
@@ -117,7 +140,7 @@ def load_data(directory, dashboard_id, host, port, isCohort=False, chunksize=Non
         matrix = matrix.merge(genes[['gene_idx', 'gene']])
         matrix = matrix.merge(samples[['sample_id']])
 
-        logger.info(f'Loading {matrix.shape[0]} records with total {cells.shape[0]} cells and {matrix.shape[0]} gene records')
+        logger.info(f'Loading {matrix.shape[0]} records with total {cells.shape[0]} cells ({round(cells.shape[0] * 100 / before_cell_count, 2)}%) and {matrix.shape[0]} gene records')
         
         load_cells(get_records(cells, matrix), dashboard_id, host, port)
         return
@@ -132,7 +155,6 @@ def load_data(directory, dashboard_id, host, port, isCohort=False, chunksize=Non
     matrix_iter = pd.read_csv(matrix_filename, sep=' ', usecols=[0,1,2], skiprows=1, chunksize=chunksize)
 
     for matrix_chunk in matrix_iter:
-        logger.info(f'Matrix size: {matrix_chunk.shape}')
         total_cells = int(matrix_chunk.columns[1])
         total_records = int(matrix_chunk.columns[2])
 
@@ -171,17 +193,16 @@ def load_data(directory, dashboard_id, host, port, isCohort=False, chunksize=Non
         num_records += load_chunk.shape[0]
 
         # Load the data
-        logger.info(f'Loading {load_chunk.shape[0]} records with total {cell_count} cells and {num_records} gene records')
+        logger.info(f'Loading {load_chunk.shape[0]} records with total {cell_count} cells ({round(cell_count * 100/ total_cells, 2)}%) and {num_records} gene records')
         load_cells(get_records(cells, load_chunk), dashboard_id, host, port)
  
     # Clear queue
     if prev_chunk is not None:
-        logger.info("END")
         cell_ids.append(prev_chunk[['cell_id']].drop_duplicates())
         num_records += prev_chunk.shape[0]
         cell_count += len(prev_chunk['cell_id'].unique())
 
-        logger.info(f'Loading {prev_chunk.shape[0]} records with total {cell_count} cells and {num_records} gene records')
+        logger.info(f'Loading {prev_chunk.shape[0]} records with total {cell_count} cells ({round(cell_count * 100/ total_cells, 2)}%) and {num_records} gene records')
 
         # Load the last cell worth of data
         load_cells(get_records(cells, prev_chunk), dashboard_id, host, port)
@@ -214,6 +235,7 @@ def get_records(cells, matrix):
         records.append(cell_record)
 
     return records
+
 
 
 ## main method. Will load both data and metadata records needed for Mira
