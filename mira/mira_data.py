@@ -80,23 +80,24 @@ def download_analyses_data(type, analyses, base_directory, cohort_group=None):
                 subset_analyses = analyses[1:]
             
             if cohort_analysis is not None:
-                directory = os.path.join(base_directory, analysis["dashboard_id"])
-                logger.info(f'Starting download for {analysis["dashboard_id"]}')
+                directory = os.path.join(base_directory, cohort_analysis["dashboard_id"])
+                logger.info(f'Starting download for {cohort_analysis["dashboard_id"]}')
                 if not os.path.exists(directory):
                     logger.info(f'Creating directory: {directory}')
                     os.makedirs(directory)
 
                 ## download main cohort file
-                logger.info(f'{analysis["dashboard_id"]}: Downloading cells')
+                logger.info(f'{cohort_analysis["dashboard_id"]}: Downloading cells')
                 scp.get(os.path.join(cohort_analysis["juno_storage"], constants.CELLS_FILENAME), directory)
-                logger.info(f'{analysis["dashboard_id"]}: Downloading genes')
-                scp.get(os.path.join(cohort_analysis["juno_storage"], constants.GENES_FILENAME), directory)
-                logger.info(f'{analysis["dashboard_id"]}: Downloading matrix')
-                scp.get(os.path.join(cohort_analysis["juno_storage"], constants.MATRIX_FILENAME), directory)
+                logger.info(f'{cohort_analysis["dashboard_id"]}: Downloading genes')
+                scp.get(os.path.join(cohort_analysis["juno_storage"], constants.MATRIX_FILENAME), os.path.join(directory, constants.GENES_FILENAME))
+                ## it's always misnamed here
+                logger.info(f'{cohort_analysis["dashboard_id"]}: Downloading matrix')
+                scp.get(os.path.join(cohort_analysis["juno_storage"], constants.GENES_FILENAME), os.path.join(directory, constants.MATRIX_FILENAME))
 
-                generate_cohort_metadata_json(analysis, metadata, directory)
-                generate_marker_genes(analysis, directory)
-                logger.info(f'Done download for {analysis["dashboard_id"]}')
+                generate_cohort_metadata_json(cohort_analysis, metadata, directory)
+                generate_marker_genes(cohort_analysis, directory)
+                logger.info(f'Done download for {cohort_analysis["dashboard_id"]}')
 
             if len(subset_analyses) > 0:
                 ## assume that cohort data is already downloaded
@@ -111,7 +112,8 @@ def download_analyses_data(type, analyses, base_directory, cohort_group=None):
                     ## transfer the cell type file over and rename it appropriately
                     ## sym link to the large cohort genes and matrix file
                     logger.info(f'{analysis["dashboard_id"]}: Downloading cells')
-                    scp.get(analysis["juno_storage"], os.path.join(directory, constants.CELLS_FILENAME))
+                    scp.get(analysis["juno_storage"] + "_embedding.tsv", os.path.join(directory, constants.CELLS_FILENAME))
+                    reprocess_cohort_subset(directory, cohort_directory, analysis["dashboard_id"])
 
                     logger.info(f'{analysis["dashboard_id"]}: Linking genes')
                     os.symlink(os.path.join(cohort_directory, constants.GENES_FILENAME), os.path.join(directory, constants.GENES_FILENAME))
@@ -119,7 +121,11 @@ def download_analyses_data(type, analyses, base_directory, cohort_group=None):
                     os.symlink(os.path.join(cohort_directory, constants.MATRIX_FILENAME), os.path.join(directory, constants.MATRIX_FILENAME))
 
                     generate_cohort_metadata_json(analysis, metadata, directory)
-                    generate_marker_genes(analysis, directory)
+
+                    ## marker gene matrix is different
+                    scp.get(analysis["juno_storage"] + "_marker_sheet.tsv", os.path.join(directory, constants.JUNO_MARKERS_FILENAME))
+                    generate_cohort_subset_marker_genes(analysis, directory)
+                    # generate_marker_genes(analysis, directory)
                     logger.info(f'Done download for {analysis["dashboard_id"]}')
 
             
@@ -248,16 +254,59 @@ def generate_marker_genes(analysis, directory):
     with open(os.path.join(directory, constants.MARKER_GENES_FILENAME), 'w+') as outfile:
         json.dump(data, outfile)
 
+def generate_cohort_subset_marker_genes(analysis, directory):
+    marker_genes = pd.read_csv(os.path.join(directory, constants.JUNO_MARKERS_FILENAME), sep='\t')
+
+    cell_types = [col for col in list(marker_genes.columns) if col.lower() != 'rank']
+
+    data = []
+    for i in range(len(cell_types)):
+        record = {
+            "cell_type": cell_types[i].replace('.', ' '),
+            "genes": [x for x in list(marker_genes[cell_types[i]]) if str(x) != 'nan']
+        }
+
+        data.append(record)
+
+    logger.info(f'{analysis["dashboard_id"]}: Create marker gene files with {len(data)} cells')
+    with open(os.path.join(directory, constants.MARKER_GENES_FILENAME), 'w+') as outfile:
+        json.dump(data, outfile)
+
+    
 
 
 def get_celltype_analyses(cohort_analysis):
     ## Just hardcoding here
-    cell_types = ["B.cell","B.super", "Dendritic.cell", "Endothelial.cell", "Fibroblast", "Monocyte", "Myeloid.super", "Ovarian.cancer.cell", "Ovarian.cancer.super", "Plasma.cell", "Stromal.super", "Mast.cell", "T.cell", "T.super"]
+    ## We will be grabbing these in Florian's directory
+    cell_types = ["B.super", "Endothelial.cell", "Fibroblast", "Myeloid.super", "T.cell"]
     return [{
-        "juno_storage": cohort_analysis["juno_storage"] + "/celltypes/" + cell_type + "_cells.tsv",
+        "juno_storage": "/work/shah/uhlitzf/data/SPECTRUM/freeze/v5/" + cell_type,
         "modified": cohort_analysis["modified"],
         "dashboard_id": "cohort_" + cell_type.replace(".", "-").lower()
     } for cell_type in cell_types]
+
+
+
+def reprocess_cohort_subset(directory, cohort_directory, dashboard_id): 
+    cells_filename = os.path.join(directory, constants.CELLS_FILENAME)
+    
+    cohort_cells_filename = os.path.join(cohort_directory, constants.CELLS_FILENAME)
+
+    ## need to generate cells_idx to make it map correctly to matrix
+    ## also add cell_type column
+    cells = pd.read_csv(cells_filename, sep='\t')
+    cohort_cells = pd.read_csv(cohort_cells_filename, sep='\t')
+    cohort_cells.index.name = 'cell_idx'
+    cohort_cells = cohort_cells.reset_index(drop=False)
+    cohort_cells = cohort_cells[['cell_idx', 'cell_id', 'cell_type']]
+    cells = cells.merge(cohort_cells)
+
+    # Florian's data has the metadata in there already, so need to remove
+    cells = cells.drop(columns=['patient_id', 'tumor_supersite', 'tumor_subsite', 'sort_parameters', 'therapy'])
+
+    ## Write
+    cells.to_csv(cells_filename, sep='\t')
+
 
 
 

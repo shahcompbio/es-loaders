@@ -98,9 +98,11 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
     if 'cell_id' not in cells.columns:
         cells.index.name = 'cell_id'
         cells = cells.reset_index(drop=False)
+        
+    if 'cell_idx' not in cells.columns:
+        cells.index.name = 'cell_idx'
+        cells = cells.reset_index(drop=False)
 
-    cells.index.name = 'cell_idx'
-    cells = cells.reset_index(drop=False)
     cells['cell_type'] = cells['cell_type'].str.replace('.', ' ')
 
     logger.info("Opening genes file")
@@ -155,7 +157,7 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
     matrix_iter = pd.read_csv(matrix_filename, sep=' ', usecols=[0,1,2], skiprows=1, chunksize=chunksize)
 
     for matrix_chunk in matrix_iter:
-        total_cells = int(matrix_chunk.columns[1])
+        total_cells = int(cells.shape[0])
         total_records = int(matrix_chunk.columns[2])
 
         matrix_chunk.columns = ['gene_idx', 'cell_idx', 'log_count']
@@ -192,9 +194,10 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
         cell_count += len(load_chunk['cell_id'].unique())
         num_records += load_chunk.shape[0]
 
-        # Load the data
-        logger.info(f'Loading {load_chunk.shape[0]} records with total {cell_count} cells ({round(cell_count * 100/ total_cells, 2)}%) and {num_records} gene records')
-        load_cells(get_records(cells, load_chunk), dashboard_id, host, port)
+        # Load the data if there are records
+        if load_chunk.shape[0] > 0:
+            logger.info(f'Loading {load_chunk.shape[0]} records with total {cell_count} cells ({round(cell_count * 100/ total_cells, 2)}%) and {num_records} gene records')
+            load_cells(get_records(cells, load_chunk), dashboard_id, host, port)
  
     # Clear queue
     if prev_chunk is not None:
@@ -217,9 +220,6 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
     num_cells = len(cell_ids['cell_id'].unique())
     if total_cells != num_cells:
         raise ValueError(f'mismatch in {num_cells} cells loaded to {total_cells} total cells')
-
-    if num_records != total_records:
-        raise ValueError(f'mismatch in {num_records} loaded to {total_records} total records')
 
 
 def get_records(cells, matrix):

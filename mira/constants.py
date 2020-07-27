@@ -4,6 +4,7 @@ CELLS_FILENAME = 'cells.tsv'
 GENES_FILENAME = 'genes.tsv'
 MATRIX_FILENAME = 'matrix.mtx'
 JUNO_SAMPLES_FILENAME = 'samples.txt'
+JUNO_MARKERS_FILENAME = 'markers.tsv'
 SAMPLES_FILENAME = 'sample_metadata.json'
 MARKER_GENES_FILENAME = 'marker_genes.json'
 
