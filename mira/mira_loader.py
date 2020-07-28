@@ -121,8 +121,16 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
         samples = pd.read_json(samples_file)
 
     before_cell_count = cells.shape[0]
-    cells = cells.rename(columns={'sample':'sample_id', 'UMAP-1': 'x', 'UMAP-2': 'y', 'umap50_1': 'x', 'umap50_2': 'y', "UMAP_1": "x", "UMAP_2": "y"})
+    cells = cells.rename(columns={'sample':'sample_id', 'UMAP-1': 'x', 'UMAP-2': 'y', 'umap50_1': 'x', 'umap50_2': 'y', "UMAP_1": "x", "UMAP_2": "y", "umapharmony_1": 'x', 'umapharmony_2': 'y'})
     cells = cells.merge(samples, on='sample_id', how='left')
+
+    ## Check that all columns are there
+    column_names = list(cells.columns)
+    assert 'x' in column_names and 'y' in column_names, 'Missing x and y'
+    assert 'cell_id' in column_names, 'Missing cell ID'
+    assert 'cell_idx' in column_names, 'Missing cell idx'
+    assert 'sample_id' in column_names, 'Missing sample ID'
+
 
     # Sanity check that joining with sample table didn't delete cell entries
     assert before_cell_count == cells.shape[0]
