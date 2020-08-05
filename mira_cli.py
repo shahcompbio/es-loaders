@@ -46,11 +46,11 @@ def main(ctx, host, port, debug):
 @click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
 @click.option('--id', help="ID of dashboard")
 @click.option('--reload', is_flag=True, help="Force reload this library")
-@click.option('--chunksize', help="How many milions of records to chunk matrix file", type=int)
+@click.option('--chunksize', help="How many milions of records to chunk matrix file", type=int, default=1)
 @click.option('--download',  is_flag=True,help="Download file if missing", type=int)
 @click.option('--load-new', is_flag=True, help="Load dashboards not currently in Mira")
 @click.option('--load-cohort', type=click.Choice(['cohort','cell_type', 'both']), help="Load cohort, cell types, or both")
-def load_analysis(ctx, data_directory, type,id,  reload, chunksize, download, load_new, load_cohort):
+def load_analyses(ctx, data_directory, type,id,  reload, chunksize, download, load_new, load_cohort):
     assert id is not None or load_new
 
     es_host = ctx.obj['host']
@@ -91,6 +91,23 @@ def load_analysis(ctx, data_directory, type,id,  reload, chunksize, download, lo
 
 
 @main.command()
+@click.argument('data_directory')
+@click.pass_context
+@click.option('--type', case_sensitive=False), help="Type of dashboard")
+@click.option('--id', help="ID of dashboard")
+@click.option('--reload', is_flag=True, help="Force reload this library")
+@click.option('--chunksize', help="How many milions of records to chunk matrix file", type=int, default=1)
+def load_analysis(ctx, data_directory, type,id,  reload, chunksize):
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    if reload:
+        _clean_analysis(analysis["dashboard_id"], host=es_host, port=es_port)
+
+    _load_analysis(analysis["directory"], type, analysis["dashboard_id"], es_host, es_port, chunksize=chunksize * int(1e6))
+
+
+@main.command()
 @click.argument('directory')
 @click.option('--reload', is_flag=True, help="Force reload")
 @click.pass_context
@@ -102,63 +119,6 @@ def load_genes(ctx, directory, reload):
 
     _load_genes(directory, host=host, port=port)
 
-
-@main.command()
-@click.argument('data_directory')
-@click.pass_context
-@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
-@click.option('--id', help="ID of dashboard")
-@click.option('--reload', is_flag=True, help="Force reload this library")
-def generate_sample_metadata(ctx, data_directory, type, id, reload):
-
-    es_host = ctx.obj['host']
-    es_port = ctx.obj["port"]
-
-    analyses_metadata = get_new_isabl_analyses(type, es_host=es_host, es_port=es_port)
-
-    download_metadata(analyses_metadata, data_directory)
-
-@main.command()
-@click.argument('data_directory')
-@click.pass_context
-@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
-@click.option('--id', help="ID of dashboard")
-@click.option('--reload', is_flag=True, help="Force reload this library")
-def generate_sample_metadata_cohort(ctx, data_directory, type, id, reload):
-
-    es_host = ctx.obj['host']
-    es_port = ctx.obj["port"]
-
-    analyses_metadata = get_new_isabl_analyses(type, es_host=es_host, es_port=es_port)
-
-    download_metadata(analyses_metadata, data_directory)
-
-
-@main.command()
-@click.argument('data_directory')
-@click.pass_context
-@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
-@click.option('--id', help="ID of dashboard")
-@click.option('--reload', is_flag=True, help="Force reload this library")
-def load_dashboard_entry(ctx, data_directory, type, id, reload):
-    es_host = ctx.obj['host']
-    es_port = ctx.obj["port"]
-
-    analyses_metadata = get_new_isabl_analyses(type, es_host=es_host, es_port=es_port)
-
-    analyses = [{**analysis, "directory": data_directory if data_directory.endswith(analysis["dashboard_id"]) or type == "cohort" else os.path.join(data_directory, analysis["dashboard_id"]) } for analysis in analyses_metadata]
-
-
-    for analysis in analyses:
-        metadata = {
-            "date": analysis["modified"]
-        }
-
-        if reload:
-            clean_dashboard_entry(analysis["dashboard_id"], es_host, es_port)
-
-        _load_dashboard_entry(analysis["directory"], type, analysis["dashboard_id"], metadata, es_host, es_port)
-    
 
 
 @main.command()
