@@ -1,199 +1,412 @@
 
-import click
-import sys
-import math
-import yaml
 import logging
-import itertools
-import numpy
-from mira.metadata_parser import MiraMetadata
-from mira.rho_loader import get_rho_celltypes
-from mira.mira_cleaner import clean_analysis
-from common.scrna_parser import scRNAParser
-from mira.cell_probability import CellTypeProbability
-from utils.elasticsearch import load_records, load_record
+import os
+import pandas as pd
+import json
+
+from mira.elasticsearch import load_cells, load_dashboard_entry as _load_dashboard_entry, load_rho as _load_rho, get_cell_type_count
+import mira.constants as constants
 
 
-# SAMPLE_METADATA_INDEX = "sample_metadata"
-SAMPLE_STATS_INDEX = "sample_stats"
-# SAMPLE_CELLS_INDEX = "sample_cells"
-# DASHBOARD_REDIM_INDEX = "dashboard_redim_"
-
-DASHBOARD_CELLS_INDEX = "dashboard_cells"
-DASHBOARD_GENES_INDEX = "dashboard_genes_"
-DASHBOARD_ENTRY_INDEX = "dashboard_entry"
 logger = logging.getLogger('mira_loading')
 
 
-def load_analysis(filepath, dashboard_id, type, host, port, metadata=None):
 
-    if metadata is None:
-        metadata = MiraMetadata()
 
+## main method. 
+## Will load both data, metadata, and marker gene records needed for Mira   
+## ASSUMES THAT DIRECTORY IS WHERE THE FILES ARE KEPT
+## ASSUMES the following files:
+##   - genes.tsv
+##   - cells.tsv
+##   - matrix.mtx
+##   - sample_metadata.json
+##   - marker_genes.json
+def load_analysis(directory, type, dashboard_id, host, port, chunksize=None, metadata={}):
     logger.info("====================== " + dashboard_id)
-    file = _get_filepath(filepath, dashboard_id, type)
-    logger.info("Opening File: " + file)
-    data = scRNAParser(file)
-    if type == "sample":
-        logger.info("Load Sample Data")
-        load_sample_statistics(data, dashboard_id, host=host, port=port)
 
-    load_dashboard_cells(data, type, dashboard_id,
-                         metadata, filepath, host=host, port=port)
-    load_dashboard_genes(data, type, dashboard_id, host=host, port=port)
-    load_dashboard_entry(type, dashboard_id,
-                         metadata=metadata, host=host, port=port)
+    load_data(directory, dashboard_id, host, port, chunksize=chunksize, metadata=metadata)
+    load_rho(directory, dashboard_id, host, port)
+    load_dashboard_entry(directory, type,dashboard_id, metadata, host, port)
+
+    logger.info("Done.")
+    
 
 
-def _get_filepath(filepath, dashboard_id, type):
-    if filepath.endswith(".rdata"):
-        return filepath
-    else:
-        return filepath + dashboard_id + ".rdata"
+def load_rho(directory, dashboard_id, host, port):
+    logger.info("LOADING MARKER GENES: " + dashboard_id)
+
+    logger.debug("Opening files")
+    markers_filename = os.path.join(directory, constants.MARKER_GENES_FILENAME)
+
+    with open(markers_filename) as markers_file:
+        cell_types = json.load(markers_file)
 
 
-def load_sample_statistics(data, sample_id, host="localhost", port=9200):
+    logger.debug("Processing files")
+    records = []
 
-    logger.info("LOADING SAMPLE STATS: " + sample_id)
-    statistics = data.get_statistics()
+    for cell_type_record in cell_types:
+        count = get_cell_type_count(cell_type_record["cell_type"], dashboard_id, host, port)
 
-    stats_records = get_stats_records_generator(statistics, sample_id)
-    logger.info(" BEGINNING LOAD")
-    load_records(SAMPLE_STATS_INDEX, stats_records, host=host, port=port)
-
-
-def get_stats_records_generator(stats, sample_id):
-    for stat, value in stats.items():
-        record = {
-            "sample_id": sample_id,
-            "stat": stat,
-            "value": value
-        }
-        yield record
-
-
-def load_dashboard_cells(data, type, dashboard_id, metadata, filepath, host="localhost", port=9200):
-    logger.info("LOADING DASHBOARD CELLS: " + dashboard_id)
-
-    redim = data.get_dim_red(
-        'scanorama_UMAP') if type == "patient" else data.get_dim_red()
-
-    cells = list(redim.keys())
-
-    samples = data.get_samples()
-    celltypes = data.get_celltypes()
-    rho_celltypes = get_rho_celltypes()
-
-    sample_list = [metadata.get_igo_to_sample_id(
-        sample) for sample in data.get_sample_list()]
-    celltype_probabilities = CellTypeProbability(
-        filepath, sample_list, rho_celltypes)
-
-    cell_records = get_cells_generator(
-        cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata)
-
-    logger.info(" BEGINNING LOAD")
-    load_records(DASHBOARD_CELLS_INDEX, cell_records, host=host, port=port)
-
-
-def get_cells_generator(cells, samples, celltypes, rho_celltypes, celltype_probabilities, redim, dashboard_id, metadata):
-
-    for cell in cells:
-        [barcode, sample] = cell.split(":")
-        sample = metadata.get_igo_to_sample_id(sample)
-        cell_probabilities = celltype_probabilities.get_cell_probabilities(
-            sample, barcode)
-
-        record = {
+        records.append({
+            **cell_type_record,
             "dashboard_id": dashboard_id,
-            "cell_id": cell,
-            "cell_type": celltypes[cell],
-            "x": redim[cell][0],
-            "y": redim[cell][1],
-            "sample_id": metadata.get_igo_to_sample_id(samples[cell]),
-            ** cell_probabilities
-        }
-        yield record
+            "count": count
+        })        
+
+    _load_rho(records, host=host, port=port)
+    logger.info("LOADED MARKER GENES")
 
 
-def load_dashboard_genes(data, type, dashboard_id, host="localhost", port=9200):
-    logger.info("LOADING DASHBOARD GENES: " + dashboard_id)
-
-    redim = data.get_dim_red(
-        'scanorama_UMAP') if type == "patient" else data.get_dim_red()
-
-    [gene_symbols, cell_barcodes, gene_matrix] = data.get_gene_matrix()
-
-    gene_records = get_gene_record_generator(
-        redim, gene_symbols, cell_barcodes, gene_matrix, dashboard_id)
-    logger.info(" BEGINNING LOAD")
-    load_records(DASHBOARD_GENES_INDEX + dashboard_id.lower(),
-                 gene_records, host=host, port=port)
-
-
-def get_gene_record_generator(redim, gene_symbols, cell_barcodes, gene_matrix, dashboard_id):
-    cells = list(redim.keys())
-    num_genes, num_cells = gene_matrix.shape
-    if isinstance(gene_matrix, numpy.ndarray):
-        for row in range(num_genes):
-            for column in range(num_cells):
-                data = gene_matrix[row, column]
-                if cell_barcodes[column] in cells and float(data) != 0.0:
-                    record = {
-                        "cell_id": cell_barcodes[column],
-                        "gene": gene_symbols[row],
-                        "log_count": float(data),
-                        "dashboard_id": dashboard_id,
-                        "x": redim[cell_barcodes[column]][0],
-                        "y": redim[cell_barcodes[column]][1]
-                    }
-                    yield record
-
-    else:
-        for row in range(num_genes):
-            k = gene_matrix.indptr[row]
-            l = gene_matrix.indptr[row+1]
-            for data, column in zip(gene_matrix.data[k:l], gene_matrix.indices[k:l]):
-                if cell_barcodes[column] in cells and float(data) != 0.0:
-                    record = {
-                        "cell_id": cell_barcodes[column],
-                        "gene": gene_symbols[row],
-                        "log_count": float(data),
-                        "dashboard_id": dashboard_id,
-                        "x": redim[cell_barcodes[column]][0],
-                        "y": redim[cell_barcodes[column]][1]
-                    }
-                    yield record
-
-
-def load_dashboard_entry(type, dashboard_id, metadata, host="localhost", port=9200):
+## Loading metadata for Mira
+def load_dashboard_entry(directory, type, dashboard_id, dashboard_metadata, host, port):
 
     logger.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
 
-    metadata_records = _get_metadata(type, dashboard_id, metadata)
+    logger.debug("Opening files")
+    metadata_filename = os.path.join(directory, constants.SAMPLES_FILENAME)
+
+    with open(metadata_filename) as samples_file:
+        samples = pd.read_json(samples_file)
 
     record = {
         "dashboard_id": dashboard_id,
         "type": type,
-        "patient_id": metadata_records[0]["patient_id"],
-        "sort": list(set([datum['sort_parameters'] for datum in metadata_records])),
-        "sample_ids": [datum["nick_unique_id"] for datum in metadata_records],
-        "surgery": list(set([datum["time"] for datum in metadata_records])),
-        "treatment": list(set([datum["therapy"] for datum in metadata_records])),
-        "site": list(set([datum["tumour_site"] for datum in metadata_records]))
+        "samples": samples[:].to_dict(orient='records'),
+        **dashboard_metadata
     }
-    logger.info(" BEGINNING LOAD")
-    logger.info(record)
-    load_record(DASHBOARD_ENTRY_INDEX, record, host=host, port=port)
+
+    _load_dashboard_entry(record, dashboard_id, host, port)
+    logger.info("LOADED DASHBOARD ENTRY")
 
 
-def _get_metadata(type, dashboard_id, metadata):
-    if type == "sample":
-        return metadata.get_data([dashboard_id])
-    else:  # assume patient
-        sample_ids = metadata.support_sample_ids(dashboard_id)
-        return metadata.get_data(sample_ids)
+def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
+    logger.info("LOADING DATA: " + dashboard_id)
+
+    logger.debug("Opening files")
+
+    cells_filename = os.path.join(directory, constants.CELLS_FILENAME)
+    genes_filename = os.path.join(directory, constants.GENES_FILENAME)
+    matrix_filename = os.path.join(directory, constants.MATRIX_FILENAME)
+    metadata_filename = os.path.join(directory, constants.SAMPLES_FILENAME)
+
+    logger.info("Opening Files at: " + directory)
+    logger.info("Opening cell file")
+    cells = pd.read_csv(cells_filename, sep='\t')
+
+    if 'cell_id' not in cells.columns:
+        cells.index.name = 'cell_id'
+        cells = cells.reset_index(drop=False)
+        
+    if 'cell_idx' not in cells.columns:
+        cells.index.name = 'cell_idx'
+        cells = cells.reset_index(drop=False)
+
+    cells['cell_type'] = cells['cell_type'].str.replace('.', ' ')
+
+    logger.info("Opening genes file")
+    genes = pd.read_csv(genes_filename, sep='\t')
+    genes.index.name = 'gene_idx'
+    genes = genes.reset_index(drop=False)
+    genes = genes.rename(columns={'genes': 'gene'})
+
+    # Rows and columns are 1-based
+    cells['cell_idx'] += 1
+    genes['gene_idx'] += 1
 
 
-if __name__ == '__main__':
-    pass
+    logger.info("Opening metadata file")
+    with open(metadata_filename) as samples_file:
+        samples = pd.read_json(samples_file)
+
+    before_cell_count = cells.shape[0]
+    cells = cells.rename(columns={'sample':'sample_id', 'UMAP-1': 'x', 'UMAP-2': 'y', 'umap50_1': 'x', 'umap50_2': 'y', "UMAP_1": "x", "UMAP_2": "y", "umapharmony_1": 'x', 'umapharmony_2': 'y'})
+    cells = cells.merge(samples, on='sample_id', how='left')
+
+    ## Check that all columns are there
+    column_names = list(cells.columns)
+    assert 'x' in column_names and 'y' in column_names, 'Missing x and y'
+    assert 'cell_id' in column_names, 'Missing cell ID'
+    assert 'cell_idx' in column_names, 'Missing cell idx'
+    assert 'sample_id' in column_names, 'Missing sample ID'
+
+
+    # Sanity check that joining with sample table didn't delete cell entries
+    assert before_cell_count == cells.shape[0]
+
+    logger.info("Cells: " + str(cells.shape[0]))
+    logger.info("Genes: " + str(genes.shape[0]))
+    logger.info("Samples: " + str(samples.shape[0]))
+
+    if chunksize is None:
+        matrix = pd.read_csv(matrix_filename, sep=' ', usecols=[0,1,2], skiprows=1)
+
+        assert int(matrix.columns[0]) == genes.shape[0]
+        assert int(matrix.columns[1]) == cells.shape[0]
+
+        matrix.columns = ['gene_idx', 'cell_idx', 'log_count']
+        matrix = matrix.merge(cells[['cell_idx', 'cell_id']])
+        matrix = matrix.merge(genes[['gene_idx', 'gene']])
+        matrix = matrix.merge(samples[['sample_id']])
+
+        logger.info(f'Loading {matrix.shape[0]} records with total {cells.shape[0]} cells ({round(cells.shape[0] * 100 / before_cell_count, 2)}%) and {matrix.shape[0]} gene records')
+        
+        load_cells(get_records(cells, matrix), dashboard_id, host, port)
+        return
+
+    prev_chunk = None
+    cell_ids = []
+    cell_count = 0
+    num_records = 0
+
+    logger.info("Starting to chunk matrix file")
+
+    matrix_iter = pd.read_csv(matrix_filename, sep=' ', usecols=[0,1,2], skiprows=1, chunksize=chunksize)
+
+    for matrix_chunk in matrix_iter:
+        total_cells = int(cells.shape[0])
+        total_records = int(matrix_chunk.columns[2])
+
+        matrix_chunk.columns = ['gene_idx', 'cell_idx', 'log_count']
+
+        # Need at least 2 cells of data per chunk for correctness of streaming
+        if len(matrix_chunk['cell_idx'].unique()) <= 1:
+            raise ValueError('chunk size set too low')
+
+        # Identify the last cell to be read
+        last_cell_idx = matrix_chunk['cell_idx'].values[-1]
+
+        matrix_chunk = matrix_chunk.merge(cells[['cell_idx', 'cell_id']])
+        matrix_chunk = matrix_chunk.merge(genes[['gene_idx', 'gene']])
+        # matrix_chunk = matrix_chunk.merge(samples[['sample_id']])
+
+        # Split out last cell id data
+        first_cells_chunk = matrix_chunk.loc[matrix_chunk['cell_idx'] != last_cell_idx]
+        last_cell_chunk = matrix_chunk.loc[matrix_chunk['cell_idx'] == last_cell_idx]
+
+        # Merge previous chunk
+        if prev_chunk is not None:
+            load_chunk = pd.concat([prev_chunk, first_cells_chunk], ignore_index=True)
+        else:
+            load_chunk = first_cells_chunk
+
+        # Set chunk of last cells aside
+        if last_cell_chunk.empty:
+            prev_chunk = None
+        else:
+            prev_chunk = last_cell_chunk
+
+        # Update for checking later
+        cell_ids.append(load_chunk[['cell_id']].drop_duplicates())
+        cell_count += len(load_chunk['cell_id'].unique())
+        num_records += load_chunk.shape[0]
+
+        # Load the data if there are records
+        if load_chunk.shape[0] > 0:
+            logger.info(f'Loading {load_chunk.shape[0]} records with total {cell_count} cells ({round(cell_count * 100/ total_cells, 2)}%) and {num_records} gene records')
+            load_cells(get_records(cells, load_chunk), dashboard_id, host, port)
+ 
+    # Clear queue
+    if prev_chunk is not None:
+        cell_ids.append(prev_chunk[['cell_id']].drop_duplicates())
+        num_records += prev_chunk.shape[0]
+        cell_count += len(prev_chunk['cell_id'].unique())
+
+        logger.info(f'Loading {prev_chunk.shape[0]} records with total {cell_count} cells ({round(cell_count * 100/ total_cells, 2)}%) and {num_records} gene records')
+
+        # Load the last cell worth of data
+        load_cells(get_records(cells, prev_chunk), dashboard_id, host, port)
+
+
+    cell_ids = pd.concat(cell_ids)
+
+    if cell_ids['cell_id'].duplicated().any():
+        raise ValueError('streaming failed, duplicate cells')
+        ## !!! wilL need to eventually delete or something
+
+    num_cells = len(cell_ids['cell_id'].unique())
+    if total_cells != num_cells:
+        raise ValueError(f'mismatch in {num_cells} cells loaded to {total_cells} total cells')
+
+
+def get_records(cells, matrix):
+    records = []
+    for cell_id, cell_info in matrix.groupby('cell_id'):
+        gene_counts = cell_info[['gene', 'log_count']].to_dict(orient='records')
+        cell_meta = cells.query(f'cell_id == "{cell_id}"')
+        assert cell_meta.shape[0] == 1
+        # cell_record = cell_meta[['cell_id', 'cell_type', 'UMAP-1', 'UMAP-2', 'sample']].iloc[0].to_dict()
+        cell_record = cell_meta[:].iloc[0].to_dict()
+        cell_record['genes'] = gene_counts
+
+        records.append(cell_record)
+
+    return records
+
+
+
+## main method. Will load both data and metadata records needed for Mira
+# def load_analysis(directory, dashboard_id, host, port, isCohort=False, chunksize=None, metadata={}):
+#     logger.info("====================== " + dashboard_id)
+#     load_data(directory, dashboard_id, host, port,isCohort=isCohort, chunksize=chunksize, metadata=metadata)
+
+#     load_dashboard_entry(directory, dashboard_id, metadata, host, port)
+
+
+#     logger.info("Done.")
+    
+
+
+def load_celltype_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
+    logger.info("LOADING DATA: " + dashboard_id)
+
+    logger.debug("Opening files")
+    cells_filename = os.path.join(directory, dashboard_id + "_cells.tsv")
+    
+    cohort_cells_filename = os.path.join(directory, constants.CELLS_FILENAME)
+    genes_filename = os.path.join(directory, constants.GENES_FILENAME)
+    matrix_filename = os.path.join(directory, constants.MATRIX_FILENAME)
+    metadata_filename = os.path.join(directory, constants.SAMPLES_FILENAME)
+
+    logger.info("Opening Files at: " + directory)
+
+    cells = pd.read_csv(cells_filename, sep='\t')
+    # if not isCohort:
+    #     cells.index.name = 'cell_id'
+    #     cells = cells.reset_index(drop=False)
+    # cells.index.name = 'cell_idx'
+    # cells = cells.reset_index(drop=False)
+    cells['cell_type'] = cells['cell_type'].str.replace('.', ' ')
+
+    cohort_cells = pd.read_csv(cohort_cells_filename, sep='\t')
+    cohort_cells.index.name = 'cell_idx'
+    cohort_cells = cohort_cells.reset_index(drop=False)
+    cohort_cells = cohort_cells[['cell_idx', 'cell_id']]
+    cells = cells.merge(cohort_cells[['cell_idx', 'cell_id']])
+
+    logger.info("Opening genes file")
+    genes = pd.read_csv(genes_filename, sep='\t')
+    genes.index.name = 'gene_idx'
+    genes = genes.reset_index(drop=False)
+    genes = genes.rename(columns={'genes': 'gene'})
+
+    # Rows and columns are 1-based
+    cells['cell_idx'] += 1
+    genes['gene_idx'] += 1
+
+
+    logger.info("Opening metadata file")
+    with open(metadata_filename) as samples_file:
+        samples = pd.read_json(samples_file)
+
+    before_cell_count = cells.shape[0]
+    cells = cells.rename(columns={'sample':'sample_id', 'UMAP-1': 'x', 'UMAP-2': 'y', 'umap50_1': 'x', 'umap50_2': 'y', "UMAP_1": "x", "UMAP_2": "y"})
+    cells = cells.merge(samples, on='sample_id', how='left')
+
+    # Sanity check that joining with sample table didn't delete cell entries
+    assert before_cell_count == cells.shape[0]
+
+    logger.info("Cells: " + str(cells.shape[0]))
+    logger.info("Genes: " + str(genes.shape[0]))
+    logger.info("Samples: " + str(samples.shape[0]))
+
+    if chunksize is None:
+        matrix = pd.read_csv(matrix_filename, sep=' ', usecols=[0,1,2], skiprows=1)
+
+        assert int(matrix.columns[0]) == genes.shape[0]
+        assert int(matrix.columns[1]) == cells.shape[0]
+
+        matrix.columns = ['gene_idx', 'cell_idx', 'log_count']
+        matrix = matrix.merge(cells[['cell_idx', 'cell_id']])
+        matrix = matrix.merge(genes[['gene_idx', 'gene']])
+        matrix = matrix.merge(samples[['sample_id']])
+
+        logger.info(f'Loading {matrix.shape[0]} records with total {cells.shape[0]} cells and {matrix.shape[0]} gene records')
+        
+        load_cells(get_records(cells, matrix), dashboard_id, host, port)
+        return
+
+    prev_chunk = None
+    cell_ids = []
+    cell_count = 0
+    num_records = 0
+
+    logger.info("Starting to chunk matrix file")
+
+
+    total_cells = int(cells.shape[0])
+
+    matrix_iter = pd.read_csv(matrix_filename, sep=' ', usecols=[0,1,2], skiprows=1, chunksize=chunksize)
+
+    for matrix_chunk in matrix_iter:
+
+        matrix_chunk.columns = ['gene_idx', 'cell_idx', 'log_count']
+
+        # Need at least 2 cells of data per chunk for correctness of streaming
+        if len(matrix_chunk['cell_idx'].unique()) <= 1:
+            raise ValueError('chunk size set too low')
+
+        # Identify the last cell to be read
+        last_cell_idx = matrix_chunk['cell_idx'].values[-1]
+
+        matrix_chunk = matrix_chunk.merge(cells[['cell_idx', 'cell_id']])
+        matrix_chunk = matrix_chunk.merge(genes[['gene_idx', 'gene']])
+        # matrix_chunk = matrix_chunk.merge(samples[['sample_id']])
+
+        # Split out last cell id data
+        first_cells_chunk = matrix_chunk.loc[matrix_chunk['cell_idx'] != last_cell_idx]
+        last_cell_chunk = matrix_chunk.loc[matrix_chunk['cell_idx'] == last_cell_idx]
+
+        # Merge previous chunk
+        if prev_chunk is not None:
+            load_chunk = pd.concat([prev_chunk, first_cells_chunk], ignore_index=True)
+        else:
+            load_chunk = first_cells_chunk
+
+        # Set chunk of last cells aside
+        if last_cell_chunk.empty:
+            prev_chunk = None
+        else:
+            prev_chunk = last_cell_chunk
+
+        # Update for checking later
+        cell_ids.append(load_chunk[['cell_id']].drop_duplicates())
+        cell_count += len(load_chunk['cell_id'].unique())
+        num_records += load_chunk.shape[0]
+
+        # Load the data if there are records
+        if load_chunk.shape[0] > 0:
+            logger.info(f'Loading {load_chunk.shape[0]} records with total {cell_count} cells and {num_records} gene records')
+            load_cells(get_records(cells, load_chunk), dashboard_id, host, port)
+ 
+    # Clear queue
+    if prev_chunk is not None:
+        cell_ids.append(prev_chunk[['cell_id']].drop_duplicates())
+        num_records += prev_chunk.shape[0]
+        cell_count += len(prev_chunk['cell_id'].unique())
+
+        logger.info(f'Loading {prev_chunk.shape[0]} records with total {cell_count} cells and {num_records} gene records')
+
+        # Load the last cell worth of data
+        load_cells(get_records(cells, prev_chunk), dashboard_id, host, port)
+
+
+    cell_ids = pd.concat(cell_ids)
+
+    if cell_ids['cell_id'].duplicated().any():
+        raise ValueError('streaming failed, duplicate cells')
+        ## !!! wilL need to eventually delete or something
+
+    num_cells = len(cell_ids['cell_id'].unique())
+    if total_cells != num_cells:
+        raise ValueError(f'mismatch in {num_cells} cells loaded to {total_cells} total cells')
+
+    # if num_records != total_records:
+    #     raise ValueError(f'mismatch in {num_records} loaded to {total_records} total records')
+
+    load_dashboard_entry(directory, "cohort", dashboard_id, metadata, host, port)
+
+
+# load_analysis('~/data/003/', "003", 'plvicosspecdat2', 9200)
+# load_dashboard_entry('/data/mira/SPECTRUM-OV-070', 'SPECTRUM-OV-070', { "date": "103008"}, 'plvicosspecdat2', 9200)
