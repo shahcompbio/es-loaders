@@ -93,7 +93,7 @@ def load_analyses(ctx, data_directory, type,id,  reload, chunksize, download, lo
 @main.command()
 @click.argument('data_directory')
 @click.pass_context
-@click.option('--type', case_sensitive=False), help="Type of dashboard")
+@click.option('--type', case_sensitive=False, help="Type of dashboard")
 @click.option('--id', help="ID of dashboard")
 @click.option('--reload', is_flag=True, help="Force reload this library")
 @click.option('--chunksize', help="How many milions of records to chunk matrix file", type=int, default=1)
@@ -102,9 +102,9 @@ def load_analysis(ctx, data_directory, type,id,  reload, chunksize):
     es_port = ctx.obj["port"]
 
     if reload:
-        _clean_analysis(analysis["dashboard_id"], host=es_host, port=es_port)
+        _clean_analysis(id, host=es_host, port=es_port)
 
-    _load_analysis(analysis["directory"], type, analysis["dashboard_id"], es_host, es_port, chunksize=chunksize * int(1e6))
+    _load_analysis(data_directory, type, id, es_host, es_port, chunksize=chunksize * int(1e6))
 
 
 @main.command()
