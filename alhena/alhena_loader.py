@@ -7,26 +7,22 @@ import math
 import scipy.stats
 import pandas as pd
 import numpy as np
-from es import initialize_es, load_record, load_records as _load_records
+import alhena.constants as constants
+from alhena.elasticsearch import initialize_es, load_dashboard_record, load_records as _load_records
 from scgenome.loaders.qc import load_qc_data
 
-
-DASHBOARD_ENTRY_INDEX = "analyses"
-
-LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s" 
+logger = logging.getLogger('alhena_loading')
 
 chr_prefixed = {str(a): '0' + str(a) for a in range(1, 10)}
 
 def load_analysis(dashboard_id, directory, host, port):
-    logging.basicConfig(format=LOGGING_FORMAT,
-                        stream=sys.stderr, level=logging.INFO)
-    logging.info("====================== " + dashboard_id)
+    logger.info("====================== " + dashboard_id)
     load_data(directory, dashboard_id, host, port)
     load_dashboard_entry(directory, dashboard_id, host, port)
-    logging.info("Done")
+    logger.info("Done")
 
 def load_data(directory, dashboard_id, host, port):
-    logging.info("LOADING DATA: " + dashboard_id)
+    logger.info("LOADING DATA: " + dashboard_id)
 
     hmmcopy_data = collections.defaultdict(list)
 
@@ -36,15 +32,15 @@ def load_data(directory, dashboard_id, host, port):
         hmmcopy_data[table_name] = pd.concat(
             hmmcopy_data[table_name], ignore_index=True)
 
-    logging.info(f'loading hmmcopy data with tables {hmmcopy_data.keys()}')
+    logger.info(f'loading hmmcopy data with tables {hmmcopy_data.keys()}')
 
-    for index_type, get_data in GET_DATA.items():
+    for index_type in constants.DATA_TYPES:
         index_name = f"{dashboard_id.lower()}_{index_type}"
-        logging.info(f"Index {index_name}")
+        logger.info(f"Index {index_name}")
 
-        data = get_data(hmmcopy_data)
+        data = eval(f"get_{index_type}_data(hmmcopy_data)")
 
-        logging.info(f"dataframe for {index_name} has shape {data.shape}")
+        logger.info(f"dataframe for {index_name} has shape {data.shape}")
         load_records(data, index_name, host, port)
 
 def get_qc_data(hmmcopy_data):
@@ -101,7 +97,7 @@ def load_records(data, index_name, host, port):
     total_records = data.shape[0]
     num_records = 0
 
-    batch_size = int(1e4)
+    batch_size = int(1e5)
     for batch_start_idx in range(0, data.shape[0], batch_size):
         batch_end_idx = min(batch_start_idx + batch_size, data.shape[0])
         batch_data = data.loc[data.index[batch_start_idx:batch_end_idx]]
@@ -115,6 +111,7 @@ def load_records(data, index_name, host, port):
 
         _load_records(records, index_name, host, port)
         num_records += batch_data.shape[0]
+        logger.info(f"Loading {len(records)} records. Total: {num_records} / {total_records} ({round(num_records * 100 / total_records, 2)}%)")
 
 
     if total_records != num_records:
@@ -140,9 +137,9 @@ def clean_nans(record):
             del record[field]
 
 def load_dashboard_entry(directory, dashboard_id, host, port):
-    logging.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
+    logger.info("LOADING DASHBOARD ENTRY: " + dashboard_id)
 
-    metadata_filename = os.path.join(directory, "metadata.json")
+    metadata_filename = os.path.join(directory, constants.METADATA_FILENAME)
 
     with open(metadata_filename) as metadata_file:
         metadata = json.load(metadata_file)
@@ -158,10 +155,5 @@ def load_dashboard_entry(directory, dashboard_id, host, port):
             "description": metadata["description"]
     }
 
-    load_record(record, dashboard_id, DASHBOARD_ENTRY_INDEX, host, port)
+    load_dashboard_record(record, dashboard_id, host, port)
 
-if __name__ == '__main__':
-    logging.basicConfig(format=LOGGING_FORMAT,
-                        stream=sys.stderr, level=logging.INFO)
-
-    load_analysis("SC-3882", "/data/alhena/SC-3882",  "slvicosspecdat1", 9200)
