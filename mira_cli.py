@@ -3,7 +3,7 @@ import logging
 import logging.handlers
 import os
 
-from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data, load_dashboard_entry as _load_dashboard_entry
+from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data, load_dashboard_entry as _load_dashboard_entry, load_bins as _load_bins
 from mira.mira_isabl import get_new_isabl_analyses
 from mira.mira_data import download_analyses_data, get_celltype_analyses, download_metadata
 from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry, clean_genes as _clean_genes
@@ -105,6 +105,16 @@ def load_analysis(ctx, data_directory, type,id,  reload, chunksize):
         _clean_analysis(id, host=es_host, port=es_port)
 
     _load_analysis(data_directory, type, id, es_host, es_port, chunksize=chunksize * int(1e6))
+
+
+@main.command()
+@click.pass_context
+@click.option('--id', help="ID of dashboard")
+def load_bins(ctx, id):
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    _load_bins(id, es_host, es_port)
 
 
 @main.command()

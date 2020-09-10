@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import json
 
-from mira.elasticsearch import load_cells, load_dashboard_entry as _load_dashboard_entry, load_rho as _load_rho, get_cell_type_count
+from mira.elasticsearch import load_cells, load_bins as _load_bins, load_dashboard_entry as _load_dashboard_entry, load_rho as _load_rho, get_cell_type_count, get_genes, get_bin_sizes, initialize_es
 import mira.constants as constants
 
 
@@ -231,6 +231,12 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
 
 
 def get_records(cells, matrix):
+
+
+    logger.info(f"matrix before filter: {matrix.shape[0]}")
+    matrix = matrix[matrix["gene_idx"] < 10000]
+    logger.info(f"matrix after filter: {matrix.shape[0]}")
+
     records = []
     for cell_id, cell_info in matrix.groupby('cell_id'):
         gene_counts = cell_info[['gene', 'log_count']].to_dict(orient='records')
@@ -243,6 +249,172 @@ def get_records(cells, matrix):
         records.append(cell_record)
 
     return records
+
+
+
+
+def load_bins(dashboard_id, host, port):
+
+    [x_bin_size, y_bin_size] = get_bin_sizes(dashboard_id, host, port)
+    es = initialize_es(host, port)
+    index = constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower()
+
+
+    print("categorical")
+    categorical_labels = ["cell_type", "surgery", "site", "therapy", "sort", "sample_id"]
+
+    # if type == "cohort" and dashboard_id != "cohort_all":
+    #     categorical_labels.append("cluster_label")
+
+    data_header = json.dumps({})
+    data_str = ''
+
+    for label in categorical_labels:
+        data_str += data_header + '\n' + json.dumps({"size":0,      "aggs": {
+            "agg_histogram_x": {
+                "histogram": {
+                    "field": "x",
+                    "interval": x_bin_size,
+                    "min_doc_count": 1
+                },
+                "aggs": {
+                    "agg_histogram_y": {
+                    "histogram": {
+                        "field": "y",
+                        "interval": y_bin_size,
+                        "min_doc_count": 1
+                    },
+                    "aggs": {
+                        "agg_cat": {
+                            "terms": {
+                                "field": label,
+                                "size": 1
+                            }
+                        }
+                        
+                    }
+                    }
+                }
+            }
+        }}) + '\n'
+    
+    print("querying")
+    results = es.msearch(index=index, body=data_str)
+    print(f'queries results: {len(results["responses"])}')
+
+    processed_records = []
+    for idx, res_chunk in enumerate(results["responses"]):
+        print(idx)
+        print(res_chunk.keys())
+        for response_x in res_chunk["aggregations"]["agg_histogram_x"]["buckets"]:
+            for response_y in response_x["agg_histogram_y"]["buckets"]:
+                processed_record = {
+                    "x": response_x["key"] // x_bin_size,
+                    "y": response_y["key"] // y_bin_size,
+                    "count": response_y["doc_count"],
+                    "label": categorical_labels[idx],
+                    "value": response_y["agg_cat"]["buckets"][0]["key"]
+                }
+
+                processed_records.append(processed_record)
+
+
+
+    print(len(processed_records))
+
+    _load_bins(processed_records, dashboard_id, host, port)
+
+    print("genes")
+    genes = get_genes(host, port)
+    print(f'gene length: {len(genes)}')
+    chunk_size = 20
+    gene_chunks = [genes[i * chunk_size:(i + 1) * chunk_size] for i in range((len(genes) + chunk_size - 1) // chunk_size )]  
+
+    print(f'Chunks: {len(gene_chunks)}')
+
+    for chunk_num, gene_chunk in enumerate(gene_chunks):
+        print(f'Curr chunk: {chunk_num}')
+
+        data_header = json.dumps({})
+        data_str = ''
+        for label in gene_chunk:
+            data_str += data_header + '\n' + json.dumps({"size":0,      "aggs": {
+            "agg_histogram_x": {
+                "histogram": {
+                    "field": "x",
+                    "interval": x_bin_size,
+                    "min_doc_count": 1
+                },
+                "aggs": {
+                    "agg_histogram_y": {
+                    "histogram": {
+                        "field": "y",
+                        "interval": y_bin_size,
+                        "min_doc_count": 1
+                    },
+                    "aggs": {
+                        "agg_genes": {
+                        "nested": {
+                            "path": "genes"
+                        },
+                        "aggs": {
+                            "agg_gene_filter": {
+                            "filter": {
+                                "term": {
+                                "genes.gene": label
+                                }
+                            },
+                            "aggs": {
+                                "agg_stats_genes.log_count": {
+                                "stats": {
+                                    "field": "genes.log_count"
+                                }
+                                }
+                            }
+                            }
+                        }
+                        }
+                    }
+                    }
+                }
+            }
+        }}) + '\n'
+
+        results = es.msearch(index=index, body=data_str)
+
+
+        processed_records = []
+        for idx, res_chunk in enumerate(results["responses"]):
+
+            for response_x in res_chunk["aggregations"]["agg_histogram_x"]["buckets"]:
+                for response_y in response_x["agg_histogram_y"]["buckets"]:
+                    processed_record = {
+                        "x": response_x["key"] // x_bin_size,
+                        "y": response_y["key"] // y_bin_size,
+                        "count": response_y["doc_count"],
+                        "label": gene_chunk[idx],
+                        "value": response_y["agg_genes"]["agg_gene_filter"]["agg_stats_genes.log_count"]["sum"] / response_y["doc_count"]
+                    }
+
+                    processed_records.append(processed_record)
+
+
+
+        print(len(processed_records))
+
+        _load_bins(processed_records, dashboard_id, host, port)
+
+
+      
+    
+
+
+## calculate the bins
+
+## for each bin, determine "" for each category:
+## - for categorical, this will be majority
+## - for genes, this will be average gene expression
+
 
 
 
