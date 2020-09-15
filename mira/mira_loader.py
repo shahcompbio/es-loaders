@@ -233,6 +233,7 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
 def get_records(cells, matrix):
 
 
+    ### !!! remember to remove
     logger.info(f"matrix before filter: {matrix.shape[0]}")
     matrix = matrix[matrix["gene_idx"] < 10000]
     logger.info(f"matrix after filter: {matrix.shape[0]}")
@@ -253,14 +254,14 @@ def get_records(cells, matrix):
 
 
 
-def load_bins(dashboard_id, host, port):
+def load_bins(directory, dashboard_id, host, port):
 
     [x_bin_size, y_bin_size] = get_bin_sizes(dashboard_id, host, port)
     es = initialize_es(host, port)
     index = constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower()
 
 
-    print("categorical")
+    logger.info("categorical")
     categorical_labels = ["cell_type", "surgery", "site", "therapy", "sort", "sample_id"]
 
     # if type == "cohort" and dashboard_id != "cohort_all":
@@ -298,19 +299,17 @@ def load_bins(dashboard_id, host, port):
             }
         }}) + '\n'
     
-    print("querying")
+    logger.info("querying")
     results = es.msearch(index=index, body=data_str)
-    print(f'queries results: {len(results["responses"])}')
+    logger.info(f'queries results: {len(results["responses"])}')
 
     processed_records = []
     for idx, res_chunk in enumerate(results["responses"]):
-        print(idx)
-        print(res_chunk.keys())
         for response_x in res_chunk["aggregations"]["agg_histogram_x"]["buckets"]:
             for response_y in response_x["agg_histogram_y"]["buckets"]:
                 processed_record = {
-                    "x": response_x["key"] // x_bin_size,
-                    "y": response_y["key"] // y_bin_size,
+                    "x": round(response_x["key"] / x_bin_size),
+                    "y": round(response_y["key"] / y_bin_size),
                     "count": response_y["doc_count"],
                     "label": categorical_labels[idx],
                     "value": response_y["agg_cat"]["buckets"][0]["key"]
@@ -320,89 +319,127 @@ def load_bins(dashboard_id, host, port):
 
 
 
-    print(len(processed_records))
+    logger.info(f'records: {len(processed_records)}')
+
 
     _load_bins(processed_records, dashboard_id, host, port)
 
-    print("genes")
-    genes = get_genes(host, port)
-    print(f'gene length: {len(genes)}')
-    chunk_size = 20
-    gene_chunks = [genes[i * chunk_size:(i + 1) * chunk_size] for i in range((len(genes) + chunk_size - 1) // chunk_size )]  
+    logger.info("genes")
 
-    print(f'Chunks: {len(gene_chunks)}')
 
-    for chunk_num, gene_chunk in enumerate(gene_chunks):
-        print(f'Curr chunk: {chunk_num}')
+    cells_filename = os.path.join(directory, constants.CELLS_FILENAME)
+    genes_filename = os.path.join(directory, constants.GENES_FILENAME)
+    matrix_filename = os.path.join(directory, constants.MATRIX_FILENAME)
 
-        data_header = json.dumps({})
-        data_str = ''
-        for label in gene_chunk:
-            data_str += data_header + '\n' + json.dumps({"size":0,      "aggs": {
-            "agg_histogram_x": {
-                "histogram": {
-                    "field": "x",
-                    "interval": x_bin_size,
-                    "min_doc_count": 1
-                },
-                "aggs": {
-                    "agg_histogram_y": {
-                    "histogram": {
-                        "field": "y",
-                        "interval": y_bin_size,
-                        "min_doc_count": 1
-                    },
-                    "aggs": {
-                        "agg_genes": {
-                        "nested": {
-                            "path": "genes"
-                        },
-                        "aggs": {
-                            "agg_gene_filter": {
-                            "filter": {
-                                "term": {
-                                "genes.gene": label
-                                }
-                            },
-                            "aggs": {
-                                "agg_stats_genes.log_count": {
-                                "stats": {
-                                    "field": "genes.log_count"
-                                }
-                                }
-                            }
-                            }
-                        }
-                        }
-                    }
-                    }
-                }
+    logger.info("Opening Files at: " + directory)
+    logger.info("Opening cell file")
+    cells = pd.read_csv(cells_filename, sep='\t')
+
+    if 'cell_id' not in cells.columns:
+        cells.index.name = 'cell_id'
+        cells = cells.reset_index(drop=False)
+        
+    if 'cell_idx' not in cells.columns:
+        cells.index.name = 'cell_idx'
+        cells = cells.reset_index(drop=False)
+
+    cells['cell_type'] = cells['cell_type'].str.replace('.', ' ')
+    cells = cells.rename(columns={'sample':'sample_id', 'UMAP-1': 'x', 'UMAP-2': 'y', 'umap50_1': 'x', 'umap50_2': 'y', "UMAP_1": "x", "UMAP_2": "y", "umapharmony_1": 'x', 'umapharmony_2': 'y'})
+
+    cells['x'] = cells['x'] // x_bin_size
+    cells['y'] = cells['y'] // y_bin_size
+
+    ## convert to dict???
+    cells['count'] = 0
+    binned_counts = cells[['x', 'y','count']].groupby(['x','y']).count().reset_index().to_dict(orient='record')
+
+    logger.info("Opening genes file")
+    genes = pd.read_csv(genes_filename, sep='\t')
+    genes.index.name = 'gene_idx'
+    genes = genes.reset_index(drop=False)
+    genes = genes.rename(columns={'genes': 'gene'})
+
+    # Rows and columns are 1-based
+    cells['cell_idx'] += 1
+    genes['gene_idx'] += 1
+
+
+
+    matrix_iter = pd.read_csv(matrix_filename, sep=' ', usecols=[0,1,2], skiprows=1, chunksize=int(1e6))
+
+    count_bins = {}
+    for bin_count in binned_counts:
+        key = f"{bin_count['x']}_{bin_count['y']}"
+        count_bins[key] = {'count': bin_count['count']}
+
+    logger.info(f'Bins: {len(count_bins.keys())}')
+
+    num_chunk = 0
+    for matrix_chunk in matrix_iter:
+        logger.info(f'processing chunk {num_chunk} ')
+        matrix_chunk.columns = ['gene_idx', 'cell_idx', 'log_count']
+
+        matrix_chunk = matrix_chunk.merge(cells[['cell_idx', 'x', 'y']])
+        matrix_chunk = matrix_chunk.merge(genes[['gene_idx', 'gene']])
+
+        counts = matrix_chunk[['gene', 'log_count', 'x', 'y']].to_dict(orient="records")
+
+        for count in counts:
+            key = f"{count['x']}_{count['y']}"
+            curr_bin = count_bins[key]
+            curr_gene = count['gene']
+            if curr_gene in curr_bin:
+                curr_bin[curr_gene] = curr_bin[curr_gene] + count['log_count']
+            else:
+                curr_bin[curr_gene] = count['log_count']
+
+            count_bins[key] = curr_bin
+
+        num_chunk += 1
+
+
+
+    records = []
+    total_records = 0
+
+    gene_names = genes['gene'].to_list()
+
+    for key, counts in count_bins.items():
+        [x, y] = key.split("_")
+        
+        total_count = counts['count']
+
+        for gene in gene_names:
+            record = {
+                'x': float(x),
+                'y': float(y),
+                'count': total_count,
+                'label': gene,
+                'value': counts[gene] / total_count if gene in counts else 0
             }
-        }}) + '\n'
 
-        results = es.msearch(index=index, body=data_str)
+            records.append(record)
+
+        if len(records) > int(1e6):
+            logger.info(f'Records: {len(records)}')
+            logger.info(f'Example record: {records[0]}')
+            _load_bins(records, dashboard_id, host, port)
+
+            total_records += len(records)
+            logger.info(f'Total records: {total_records}')
+
+            records = []
+
+    if len(records) > 0:
+        logger.info(f'Records: {len(records)}')
+        logger.info(f'Example record: {records[0]}')
+        _load_bins(records, dashboard_id, host, port, refresh=True)
+
+        total_records += len(records)
+        logger.info(f'Total records: {total_records}')
 
 
-        processed_records = []
-        for idx, res_chunk in enumerate(results["responses"]):
-
-            for response_x in res_chunk["aggregations"]["agg_histogram_x"]["buckets"]:
-                for response_y in response_x["agg_histogram_y"]["buckets"]:
-                    processed_record = {
-                        "x": response_x["key"] // x_bin_size,
-                        "y": response_y["key"] // y_bin_size,
-                        "count": response_y["doc_count"],
-                        "label": gene_chunk[idx],
-                        "value": response_y["agg_genes"]["agg_gene_filter"]["agg_stats_genes.log_count"]["sum"] / response_y["doc_count"]
-                    }
-
-                    processed_records.append(processed_record)
-
-
-
-        print(len(processed_records))
-
-        _load_bins(processed_records, dashboard_id, host, port)
+    
 
 
       

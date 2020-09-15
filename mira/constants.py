@@ -131,7 +131,8 @@ DASHBOARD_ENTRY_INDEX_MAPPING = {
 BINS_INDEX_MAPPING = {
     "settings": {
         "index": {
-            "max_result_window": 50000
+            "max_result_window": 50000,
+            "refresh_interval": -1
         }
     },    
     'mappings': {

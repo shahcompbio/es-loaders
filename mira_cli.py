@@ -108,13 +108,14 @@ def load_analysis(ctx, data_directory, type,id,  reload, chunksize):
 
 
 @main.command()
+@click.argument('directory')
 @click.pass_context
 @click.option('--id', help="ID of dashboard")
-def load_bins(ctx, id):
+def load_bins(ctx, directory, id):
     es_host = ctx.obj['host']
     es_port = ctx.obj["port"]
 
-    _load_bins(id, es_host, es_port)
+    _load_bins(directory, id, es_host, es_port)
 
 
 @main.command()

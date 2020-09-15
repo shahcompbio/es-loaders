@@ -164,8 +164,12 @@ def load_rho(records, host, port):
 def load_genes(records, host, port):
     load_records(records, constants.GENES_INDEX, constants.GENES_MAPPING, host, port)
 
-def load_bins(records, dashboard_id, host, port):
+def load_bins(records, dashboard_id, host, port, refresh=False):
     load_records(records, constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower(), constants.BINS_INDEX_MAPPING, host, port)
+
+    if refresh:
+        es = initialize_es(host, port)
+        es.indices.refresh(constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower())
 
 
 def load_records(records, index_name, mapping, host, port):
