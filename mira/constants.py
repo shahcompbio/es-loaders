@@ -21,7 +21,8 @@ GENES_INDEX = "genes"
 MARKER_GENES_MAPPING = {
     "settings": {
         "index": {
-            "max_result_window": 50000
+            "max_result_window": 50000,
+            "refresh_interval": -1
         }
     },
     'mappings': {
@@ -42,7 +43,8 @@ MARKER_GENES_MAPPING = {
 GENES_MAPPING = {
     "settings": {
         "index": {
-            "max_result_window": 50000
+            "max_result_window": 50000,
+            "refresh_interval": -1
         }
     },
     'mappings': {
@@ -64,7 +66,8 @@ GENES_MAPPING = {
 CELLS_INDEX_MAPPING = {
     "settings": {
         "index": {
-            "max_result_window": 50000,
+            "max_result_window": 50000,,
+            "refresh_interval": -1
             "mapping": {
                 "nested_objects": {
                     "limit": 25000
@@ -96,7 +99,8 @@ CELLS_INDEX_MAPPING = {
 DASHBOARD_ENTRY_INDEX_MAPPING = {
     "settings": {
         "index": {
-            "max_result_window": 50000,
+            "max_result_window": 50000,,
+            "refresh_interval": -1
             "mapping": {
                 "nested_objects": {
                     "limit": 25000

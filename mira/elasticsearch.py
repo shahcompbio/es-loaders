@@ -12,7 +12,7 @@ def initialize_es(host, port):
     return es
 
 
-
+## delete
 def filter_analyses(type, host, port):
 
     es = initialize_es(host, port)
@@ -182,7 +182,7 @@ def query_cell_type_count(dashboard_id, cell_type, host, port):
     return count["count"]
 
 
-
+## probably want to turn off index refresh here too
 def load_cells(records, dashboard_id, host, port):
     load_records(records, constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower(),constants.CELLS_INDEX_MAPPING, host, port)
 
@@ -244,6 +244,8 @@ def clean_analysis(dashboard_id, host, port):
     logger.info("DELETE DATA")
     delete_index(constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower(), host=host, port=port)
 
+    delete_index(constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower(), host=host, port=port)
+
     logger.info("DELETE RHO DATA")
     clean_rho(dashboard_id, host, port)
 
@@ -256,10 +258,6 @@ def clean_dashboard_entry(dashboard_id, host, port):
     delete_records(constants.DASHBOARD_ENTRY_INDEX, 
                    dashboard_id, host=host, port=port)
 
-
-def clean_bins(dashboard_id, host, port):
-    logger.info("DELETE BIN")
-    delete_index(constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower(), host=host, port=port)
 
 def clean_genes(host, port):
     logger.info("====================== CLEANING GENES")
