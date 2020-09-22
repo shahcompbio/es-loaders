@@ -254,7 +254,8 @@ def get_records(cells, matrix):
 
 
 
-def load_bins(directory, dashboard_id, host, port):
+def load_bins(directory, type, dashboard_id, host, port):
+    logger.info("LOAD BINS: " + dashboard_id)
 
     [x_bin_size, y_bin_size] = get_bin_sizes(dashboard_id, host, port)
     es = initialize_es(host, port)
@@ -264,8 +265,8 @@ def load_bins(directory, dashboard_id, host, port):
     logger.info("categorical")
     categorical_labels = ["cell_type", "surgery", "site", "therapy", "sort", "sample_id"]
 
-    # if type == "cohort" and dashboard_id != "cohort_all":
-    #     categorical_labels.append("cluster_label")
+    if type == "cohort" and dashboard_id != "cohort_all":
+        categorical_labels.append("cluster_label")
 
     data_header = json.dumps({})
     data_str = ''
@@ -305,17 +306,21 @@ def load_bins(directory, dashboard_id, host, port):
 
     processed_records = []
     for idx, res_chunk in enumerate(results["responses"]):
-        for response_x in res_chunk["aggregations"]["agg_histogram_x"]["buckets"]:
-            for response_y in response_x["agg_histogram_y"]["buckets"]:
-                processed_record = {
-                    "x": round(response_x["key"] / x_bin_size),
-                    "y": round(response_y["key"] / y_bin_size),
-                    "count": response_y["doc_count"],
-                    "label": categorical_labels[idx],
-                    "value": response_y["agg_cat"]["buckets"][0]["key"]
-                }
+        if 'error' in res_chunk.keys():
+            logger.info(categorical_labels[idx])
+            logger.info(res_chunk['error'])
+        else:
+            for response_x in res_chunk["aggregations"]["agg_histogram_x"]["buckets"]:
+                for response_y in response_x["agg_histogram_y"]["buckets"]:
+                    processed_record = {
+                        "x": round(response_x["key"] / x_bin_size),
+                        "y": round(response_y["key"] / y_bin_size),
+                        "count": response_y["doc_count"],
+                        "label": categorical_labels[idx],
+                        "value": response_y["agg_cat"]["buckets"][0]["key"]
+                    }
 
-                processed_records.append(processed_record)
+                    processed_records.append(processed_record)
 
 
 

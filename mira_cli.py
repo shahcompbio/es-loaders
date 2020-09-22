@@ -6,7 +6,7 @@ import os
 from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data, load_dashboard_entry as _load_dashboard_entry, load_bins as _load_bins
 from mira.mira_isabl import get_new_isabl_analyses
 from mira.mira_data import download_analyses_data, get_celltype_analyses, download_metadata
-from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry, clean_genes as _clean_genes
+from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry, clean_genes as _clean_genes, clean_bins as _clean_bins, filter_analyses
 from mira.gene_loader import load_gene_names as _load_genes
 
 
@@ -90,6 +90,9 @@ def load_analyses(ctx, data_directory, type,id,  reload, chunksize, download, lo
 
 
 
+
+
+
 @main.command()
 @click.argument('data_directory')
 @click.pass_context
@@ -116,6 +119,24 @@ def load_bins(ctx, directory, id):
     es_port = ctx.obj["port"]
 
     _load_bins(directory, id, es_host, es_port)
+
+
+
+@main.command()
+@click.argument('data_directory')
+@click.pass_context
+@click.option('--type', required=True, type=click.Choice(['patient','cohort'], case_sensitive=False), help="Type of dashboard")
+def load_bins_type(ctx, data_directory, type):
+
+    es_host = ctx.obj['host']
+    es_port = ctx.obj["port"]
+
+    analyses_metadata = filter_analyses(type, es_host, es_port)
+
+    analyses = [{**analysis, "directory": data_directory if data_directory.endswith(analysis["dashboard_id"]) else os.path.join(data_directory, analysis["dashboard_id"]) } for analysis in analyses_metadata]
+
+    for analysis in analyses:
+        _load_bins(analysis["directory"], type, analysis["dashboard_id"], es_host, es_port)
 
 
 @main.command()

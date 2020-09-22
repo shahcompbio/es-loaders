@@ -12,6 +12,38 @@ def initialize_es(host, port):
     return es
 
 
+
+def filter_analyses(type, host, port):
+
+    es = initialize_es(host, port)
+
+    query = {
+        "size": 100,
+        "query": {
+            "bool": {
+            "filter": {
+                "term": {
+                "type": type
+                }
+            }
+            }
+        }
+    }
+
+    result = es.search(index="dashboard_entry", body=query)
+
+
+    new_analyses = []
+
+    for analysis in result["hits"]["hits"]:
+
+        analysis = analysis["_source"]
+        if not es.indices.exists(constants.DASHBOARD_BINS_PREFIX + analysis["dashboard_id"].lower()):
+            new_analyses.append(analysis)
+
+    print(len(new_analyses))
+    return new_analyses
+
 def get_bin_sizes(dashboard_id, host, port):
     es = initialize_es(host, port)
 
@@ -201,6 +233,7 @@ def load_record(record, record_id, index, mapping, host="localhost", port=9200):
 
 
 
+
 #=======
 
 
@@ -223,6 +256,10 @@ def clean_dashboard_entry(dashboard_id, host, port):
     delete_records(constants.DASHBOARD_ENTRY_INDEX, 
                    dashboard_id, host=host, port=port)
 
+
+def clean_bins(dashboard_id, host, port):
+    logger.info("DELETE BIN")
+    delete_index(constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower(), host=host, port=port)
 
 def clean_genes(host, port):
     logger.info("====================== CLEANING GENES")
