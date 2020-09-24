@@ -6,7 +6,7 @@ import os
 from mira.mira_loader import load_analysis as _load_analysis, load_dashboard_entry as _load_dashboard_entry, load_bins as _load_bins
 from mira.mira_isabl import get_new_isabl_analyses
 from mira.mira_data import download_analyses_data, get_celltype_analyses, download_metadata
-from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry, clean_genes as _clean_genes, filter_analyses
+from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry, clean_genes as _clean_genes
 from mira.gene_loader import load_gene_names as _load_genes
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
