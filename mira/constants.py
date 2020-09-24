@@ -66,8 +66,8 @@ GENES_MAPPING = {
 CELLS_INDEX_MAPPING = {
     "settings": {
         "index": {
-            "max_result_window": 50000,,
-            "refresh_interval": -1
+            "max_result_window": 50000,
+            "refresh_interval": -1,
             "mapping": {
                 "nested_objects": {
                     "limit": 25000
@@ -99,8 +99,8 @@ CELLS_INDEX_MAPPING = {
 DASHBOARD_ENTRY_INDEX_MAPPING = {
     "settings": {
         "index": {
-            "max_result_window": 50000,,
-            "refresh_interval": -1
+            "max_result_window": 50000,
+            "refresh_interval": -1,
             "mapping": {
                 "nested_objects": {
                     "limit": 25000
