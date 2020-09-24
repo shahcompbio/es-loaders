@@ -70,6 +70,8 @@ def load_analyses(ctx, data_directory, type,id,  reload, chunksize, download, lo
             cohort_celltype_analyses = get_celltype_analyses(analyses_metadata[0])
             analyses_metadata = analyses_metadata + cohort_celltype_analyses
 
+    analyses_metadata = [analysis for analysis in analyses_metadata if analysis["dashboard_id"] != "SPECTRUM-OV-090"]
+
     if download:
         download_analyses_data(type, analyses_metadata, data_directory, cohort_group=load_cohort)
 
