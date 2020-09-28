@@ -151,9 +151,12 @@ def query_cell_type_count(dashboard_id, cell_type, host, port):
 
 
 ## probably want to turn off index refresh here too
-def load_cells(records, dashboard_id, host, port):
+def load_cells(records, dashboard_id, host, port, refresh=False):
     load_records(records, constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower(),constants.CELLS_INDEX_MAPPING, host, port)
 
+    if refresh:
+        es = initialize_es(host, port)
+        es.indices.refresh(constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower())
 
 def load_dashboard_entry(record, dashboard_id, host, port):
     load_record(record, dashboard_id, constants.DASHBOARD_ENTRY_INDEX, constants.DASHBOARD_ENTRY_INDEX_MAPPING, host, port)

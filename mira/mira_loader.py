@@ -214,7 +214,7 @@ def load_data(directory, dashboard_id, host, port, chunksize=None, metadata={}):
         logger.info(f'Loading {prev_chunk.shape[0]} records with total {cell_count} cells ({round(cell_count * 100/ total_cells, 2)}%) and {num_records} gene records')
 
         # Load the last cell worth of data
-        load_cells(get_records(cells, prev_chunk), dashboard_id, host, port)
+        load_cells(get_records(cells, prev_chunk), dashboard_id, host, port, refresh=True)
 
 
     cell_ids = pd.concat(cell_ids)
