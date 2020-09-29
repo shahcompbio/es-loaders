@@ -7,6 +7,6 @@ click
 -e git+https://github.com/shahcompbio/isabl_cli.git@master#egg=isabl_cli
 paramiko
 scp
-google-api-python-client
+google-api-python-client==1.11.0
 google-auth-httplib2
 google-auth-oauthlib
