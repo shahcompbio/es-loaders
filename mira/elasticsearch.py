@@ -8,9 +8,66 @@ logger = logging.getLogger('mira_loading')
 
 
 def initialize_es(host, port):
-    es = Elasticsearch(hosts=[{'host': host, 'port': port}], retry_on_timeout=True, timeout=30)
+    es = Elasticsearch(hosts=[{'host': host, 'port': port}], retry_on_timeout=True, timeout=300)
     return es
 
+
+def get_bin_sizes(dashboard_id, host, port):
+    es = initialize_es(host, port)
+
+    index = constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower()
+
+    query = {
+        "size": 0,
+        "aggs": {
+            "agg_stats_x": {
+                "stats": { 
+                    "field": "x"
+                }
+            },
+            "agg_stats_y": {
+                "stats": {
+                    "field": "y"
+                }
+            }
+        }
+    }
+
+    result = es.search(index=index, body=query)
+
+    x_stats = result["aggregations"]["agg_stats_x"]
+    y_stats = result["aggregations"]["agg_stats_y"]
+
+    ## We assume 100 x 100 bins
+    return [ (x_stats["max"] - x_stats["min"]) / 100, (y_stats["max"] - y_stats["min"]) / 100]
+
+
+def get_genes(host, port):
+    es = initialize_es(host, port)
+
+    query = {
+        "size": 50000,
+        "sort": [
+            {
+            "gene": {
+                "order": "asc"
+            }
+            }
+        ]
+    }
+
+    result = es.search(index="genes", body=query)
+
+    return [record["_source"]["gene"] for record in result["hits"]["hits"]]
+
+
+def msearch(host, port, dashboard_id, query):
+    es = initialize_es(host, port)
+    index = constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower()
+
+    results = es.msearch(index=index, body=query)
+
+    print(len(results["response"]))
 
 def get_cell_type_count(cell_type, dashboard_id, host, port):
     es = initialize_es(host, port)
@@ -93,10 +150,13 @@ def query_cell_type_count(dashboard_id, cell_type, host, port):
     return count["count"]
 
 
-
-def load_cells(records, dashboard_id, host, port):
+## probably want to turn off index refresh here too
+def load_cells(records, dashboard_id, host, port, refresh=False):
     load_records(records, constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower(),constants.CELLS_INDEX_MAPPING, host, port)
 
+    if refresh:
+        es = initialize_es(host, port)
+        es.indices.refresh(constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower())
 
 def load_dashboard_entry(record, dashboard_id, host, port):
     load_record(record, dashboard_id, constants.DASHBOARD_ENTRY_INDEX, constants.DASHBOARD_ENTRY_INDEX_MAPPING, host, port)
@@ -106,6 +166,13 @@ def load_rho(records, host, port):
 
 def load_genes(records, host, port):
     load_records(records, constants.GENES_INDEX, constants.GENES_MAPPING, host, port)
+
+def load_bins(records, dashboard_id, host, port, refresh=False):
+    load_records(records, constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower(), constants.BINS_INDEX_MAPPING, host, port)
+
+    if refresh:
+        es = initialize_es(host, port)
+        es.indices.refresh(constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower())
 
 
 def load_records(records, index_name, mapping, host, port):
@@ -137,6 +204,7 @@ def load_record(record, record_id, index, mapping, host="localhost", port=9200):
 
 
 
+
 #=======
 
 
@@ -147,12 +215,16 @@ def clean_analysis(dashboard_id, host, port):
     logger.info("DELETE DATA")
     delete_index(constants.DASHBOARD_DATA_PREFIX + dashboard_id.lower(), host=host, port=port)
 
+    delete_index(constants.DASHBOARD_BINS_PREFIX + dashboard_id.lower(), host=host, port=port)
+
     logger.info("DELETE RHO DATA")
     clean_rho(dashboard_id, host, port)
 
     logger.info("DELETE DASHBOARD_ENTRY")
     delete_records(constants.DASHBOARD_ENTRY_INDEX, 
                    dashboard_id, host=host, port=port)
+
+
 
 def clean_dashboard_entry(dashboard_id, host, port):
     logger.info("DELETE DASHBOARD_ENTRY")

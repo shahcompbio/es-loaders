@@ -3,14 +3,11 @@ import logging
 import logging.handlers
 import os
 
-from mira.mira_loader import load_analysis as _load_analysis, load_celltype_data, load_dashboard_entry as _load_dashboard_entry
+from mira.mira_loader import load_analysis as _load_analysis, load_dashboard_entry as _load_dashboard_entry, load_bins as _load_bins
 from mira.mira_isabl import get_new_isabl_analyses
 from mira.mira_data import download_analyses_data, get_celltype_analyses, download_metadata
 from mira.elasticsearch import clean_analysis as _clean_analysis, load_rho as _load_rho, clean_rho as _clean_rho, clean_dashboard_entry, clean_genes as _clean_genes
 from mira.gene_loader import load_gene_names as _load_genes
-
-
-from elasticsearch import Elasticsearch
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
 
@@ -73,6 +70,8 @@ def load_analyses(ctx, data_directory, type,id,  reload, chunksize, download, lo
             cohort_celltype_analyses = get_celltype_analyses(analyses_metadata[0])
             analyses_metadata = analyses_metadata + cohort_celltype_analyses
 
+    analyses_metadata = [analysis for analysis in analyses_metadata if analysis["dashboard_id"] != "SPECTRUM-OV-090"]
+
     if download:
         download_analyses_data(type, analyses_metadata, data_directory, cohort_group=load_cohort)
 
@@ -93,7 +92,7 @@ def load_analyses(ctx, data_directory, type,id,  reload, chunksize, download, lo
 @main.command()
 @click.argument('data_directory')
 @click.pass_context
-@click.option('--type', case_sensitive=False, help="Type of dashboard")
+@click.option('--type', help="Type of dashboard")
 @click.option('--id', help="ID of dashboard")
 @click.option('--reload', is_flag=True, help="Force reload this library")
 @click.option('--chunksize', help="How many milions of records to chunk matrix file", type=int, default=1)
